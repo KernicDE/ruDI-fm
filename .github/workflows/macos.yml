@@ -1,0 +1,76 @@
+name: macOS Build
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (aarch64)
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Build (x86_64)
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Assemble app bundle
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" = "$GITHUB_REF_NAME" ]; then VERSION="0.0.0-dev"; fi
+
+          APP="ruDI.FM.app"
+          BIN_DIR="$APP/Contents/MacOS"
+          RES_DIR="$APP/Contents/Resources"
+          rm -rf "$APP"
+          mkdir -p "$BIN_DIR" "$RES_DIR"
+
+          lipo -create \
+            target/aarch64-apple-darwin/release/rudi-fm \
+            target/x86_64-apple-darwin/release/rudi-fm \
+            -output "$BIN_DIR/rudi-fm"
+          chmod +x "$BIN_DIR/rudi-fm"
+
+          cp packaging/macos/launcher.sh "$BIN_DIR/rudi-fm-launcher"
+          chmod +x "$BIN_DIR/rudi-fm-launcher"
+
+          sed "s/__VERSION__/$VERSION/" packaging/macos/Info.plist.in > "$APP/Contents/Info.plist"
+
+          echo "APPL????" > "$APP/Contents/PkgInfo"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Create DMG
+        run: |
+          set -euo pipefail
+          STAGE=dmg-root
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          cp -R ruDI.FM.app "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create -volname "ruDI.FM" -srcfolder "$STAGE" -ov -format UDZO "ruDI.FM-${VERSION}-macOS.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruDI.FM-macOS
+          path: ruDI.FM-*.dmg
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ruDI.FM-*.dmg
+          generate_release_notes: true
