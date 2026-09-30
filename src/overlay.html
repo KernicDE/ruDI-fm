@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ruDI.FM Overlay</title>
+<style>
+  /* OBS-Browserquelle: z.B. 600×140, Hintergrund bleibt transparent.
+     Parameter: ?pos=left|right  ?hide=1 (bei Stopp ausblenden, Standard)  ?scale=1.2 */
+  :root {
+    --bg: rgba(12, 14, 22, 0.82);
+    --fg: #f2f4f8;
+    --muted: #9aa3b5;
+    --accent: #3fa9f5;
+    --radius: 14px;
+  }
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  body { font-family: "Inter", "Noto Sans", system-ui, sans-serif; color: var(--fg); }
+  .card {
+    display: flex; align-items: center; gap: 16px;
+    margin: 10px; padding: 12px 18px 12px 12px;
+    width: max-content; max-width: calc(100vw - 20px); box-sizing: border-box;
+    background: var(--bg); border-radius: var(--radius);
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    transform-origin: left center;
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  body.right .card { margin-left: auto; transform-origin: right center; }
+  .card.hidden { opacity: 0; transform: translateY(12px); }
+  .cover {
+    position: relative; width: 96px; height: 96px; flex: none;
+    border-radius: 10px; overflow: hidden; background: #222;
+  }
+  .cover img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    opacity: 0; transition: opacity .5s ease;
+  }
+  .cover img.on { opacity: 1; }
+  .meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .channel { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .title { font-size: 20px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+  .artist { font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+  .bar { margin-top: 6px; height: 4px; width: 100%; min-width: 220px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width 1s linear; }
+  .bar.unknown { visibility: hidden; }
+</style>
+</head>
+<body>
+<div class="card hidden" id="card">
+  <div class="cover"><img id="imgA" alt=""><img id="imgB" alt=""></div>
+  <div class="meta">
+    <div class="channel" id="channel"></div>
+    <div class="title" id="title"></div>
+    <div class="artist" id="artist"></div>
+    <div class="bar" id="bar"><div id="fill"></div></div>
+  </div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get("pos") === "right") document.body.classList.add("right");
+  const hideWhenStopped = q.get("hide") !== "0";
+  const scale = parseFloat(q.get("scale") || "1");
+  if (scale !== 1) document.getElementById("card").style.transform = `scale(${scale})`;
+
+  const $ = (id) => document.getElementById(id);
+  let state = null, version = -1, shownCover = -1, loadingCover = -1;
+  let front = $("imgA"), back = $("imgB");
+
+  // Load the new cover into the hidden layer, cross-fade only once it is decoded.
+  function showCover(seq) {
+    if (seq === shownCover || seq === loadingCover) return;
+    loadingCover = seq;
+    const img = back;
+    img.onload = () => {
+      if (loadingCover !== seq) return;
+      img.classList.add("on");
+      front.classList.remove("on");
+      [front, back] = [img, front];
+      shownCover = seq;
+      loadingCover = -1;
+    };
+    img.onerror = () => { if (loadingCover === seq) loadingCover = -1; };  // retried on next poll
+    img.src = `/cover?c=${seq}`;
+    // give up on a stalled load so the next poll retries
+    setTimeout(() => { if (loadingCover === seq) loadingCover = -1; }, 5000);
+  }
+
+  function render() {
+    if (!state) return;
+    const card = $("card");
+    card.classList.toggle("hidden", hideWhenStopped && !state.playing);
+    if (state.duration > 0 && state.started > 0) {
+      const pct = Math.min(100, Math.max(0, (Date.now() / 1000 - state.started) / state.duration * 100));
+      $("fill").style.width = pct + "%";
+      $("bar").classList.remove("unknown");
+    } else {
+      $("bar").classList.add("unknown");
+    }
+  }
+
+  async function poll() {
+    try {
+      // Timeout: a hanging request must never freeze the overlay.
+      const r = await fetch("/nowplaying.json", { cache: "no-store", signal: AbortSignal.timeout(3000) });
+      const s = await r.json();
+      if (s.version < version) shownCover = -1;  // ruDI.FM was restarted, counters start over
+      if (s.version !== version) {
+        version = s.version;
+        $("channel").textContent = "DI.FM · " + s.channel;
+        $("title").textContent = s.title || s.channel;
+        $("artist").textContent = s.artist || "";
+      }
+      // Until the new cover is downloaded, the previous one stays visible.
+      if (s.local_cover) showCover(s.cover_seq);
+      state = s;
+    } catch (e) { /* ruDI.FM not running or slow – keep last state */ }
+  }
+  poll();
+  setInterval(poll, 1000);
+  setInterval(render, 500);  // progress keeps moving independently of the polling
+</script>
+</body>
+</html>

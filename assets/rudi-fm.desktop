@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ruDI.FM
+GenericName=DI.FM Radio
+Comment=Schlanker Terminal-Player für DI.FM Premium
+Exec=kitty --class rudi-fm --title ruDI.FM -e rudi-fm
+Icon=radio
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=radio;di.fm;musik;stream;

@@ -1,0 +1,757 @@
+{
+ "groups_order": [
+  "Trance",
+  "Psytrance & Psychedelic",
+  "House",
+  "Disco, Indie & Swing",
+  "Techno",
+  "Hard Dance",
+  "Breaks, Drum & Bass & Bass Music",
+  "Chill, Lounge & Ambient",
+  "Pop, Retro & Mainstream"
+ ],
+ "moods": {
+  "Arbeiten / Fokus": [
+   "ambient",
+   "chillout",
+   "deepprogressivehouse",
+   "dubtechno",
+   "lofihiphop",
+   "minimal",
+   "psybient",
+   "spacemusic"
+  ],
+  "Entspannen": [
+   "chilloutdreams",
+   "lounge",
+   "vocalchillout",
+   "psychill",
+   "downtempolounge",
+   "lofiloungenchill"
+  ],
+  "Gaming / Energie": [
+   "synthwave",
+   "epictrance",
+   "drumandbass",
+   "dubstep",
+   "hardstyle",
+   "futuresynthpop"
+  ],
+  "Party / Nostalgie": [
+   "classiceurodance",
+   "oldschoolrave",
+   "handsup",
+   "classictrance",
+   "edm"
+  ]
+ },
+ "channels": [
+  {
+   "key": "trance",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Das Aushängeschild: emotionale Melodien, große Breakdowns, energische Hymnen. Viele Mixshows (u.a. A State of Trance).",
+   "artists": "Armin van Buuren, Ferry Corsten, Above & Beyond"
+  },
+  {
+   "key": "vocaltrance",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Trance mit schwebenden, emotionalen Gesangsparts, starke Spannungsbögen bis zum Drop.",
+   "artists": "Gareth Emery, Roger Shah, Above & Beyond"
+  },
+  {
+   "key": "classictrance",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Trance in seiner Blütezeit (ca. 1995–2005): epische Breakdowns, riesige Builds.",
+   "artists": "Rank 1, Solarstone, Cosmic Gate"
+  },
+  {
+   "key": "classicvocaltrance",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Die Vocal-Trance-Klassiker der späten 90er und 2000er.",
+   "artists": "Delerium, Fragma, Above & Beyond"
+  },
+  {
+   "key": "epictrance",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Uplifting Trance in der lautesten Form: euphorisch, schnell, maximale Hymnen.",
+   "artists": "Sean Tyas, Alex M.O.R.P.H., John O'Callaghan"
+  },
+  {
+   "key": "deepprogressivetrance",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Ruhigere, tiefere Seite des Progressive Trance – melodisch, emotional, weniger Kitsch.",
+   "artists": "Slam Duck, Narel, SØNIN"
+  },
+  {
+   "key": "classictechno",
+   "group": "Trance",
+   "tempo": "128–140 BPM",
+   "desc": "Frühe 90er: Techno und Trance, als beides noch kaum zu trennen war. Rohe Synths, Rave-Energie.",
+   "artists": "Klassiker der frühen Rave-Ära"
+  },
+  {
+   "key": "goapsy",
+   "group": "Psytrance & Psychedelic",
+   "tempo": "70–145 BPM",
+   "desc": "Sehr psychedelischer Trance mit arpeggierten Synths und trippigen Effekten, Goa-Wurzeln.",
+   "artists": "Mad Tribe, 1200 Micrograms, Talamasca"
+  },
+  {
+   "key": "darkpsytrance",
+   "group": "Psytrance & Psychedelic",
+   "tempo": "70–145 BPM",
+   "desc": "Die dunkle, schnellere Variante – düster, verzerrt, nachtaktiv.",
+   "artists": "LiinK, Neural, Crazy Astronaut"
+  },
+  {
+   "key": "progressivepsy",
+   "group": "Psytrance & Psychedelic",
+   "tempo": "70–145 BPM",
+   "desc": "Psytrance mit rollenden Basslines, eher hypnotisch als chaotisch. Gut zum Durchlaufen lassen.",
+   "artists": "Ovnimoon, Talpa, Ace Ventura"
+  },
+  {
+   "key": "psybient",
+   "group": "Psytrance & Psychedelic",
+   "tempo": "70–145 BPM",
+   "desc": "Psychedelisches Ambient – kaum Beat, viel Klangfläche.",
+   "artists": "Chronos, Ren Toudu, School Of Crystal Healing"
+  },
+  {
+   "key": "psychill",
+   "group": "Psytrance & Psychedelic",
+   "tempo": "70–145 BPM",
+   "desc": "Downtempo mit psychedelischem Dub, Goa-Ambient und World-Einflüssen.",
+   "artists": "Shpongle, Entheogenic, Zero Cult"
+  },
+  {
+   "key": "psydub",
+   "group": "Psytrance & Psychedelic",
+   "tempo": "70–145 BPM",
+   "desc": "Dub, Ambient und Psytrance verschmolzen – basslastig, langsam, atmosphärisch.",
+   "artists": "Hinkstep, Tor.Ma, Akasha Experience"
+  },
+  {
+   "key": "house",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Klassischer 4/4-House, aktuell und breit gefächert.",
+   "artists": "Purple Disco Machine, Luna City Express"
+  },
+  {
+   "key": "deephouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "House für kleine und mittlere Clubs: tiefe, seidige Grooves.",
+   "artists": "Oxia, Eli And Fur, Andrey Exx"
+  },
+  {
+   "key": "deeporganichouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Langsamer, meditativer House mit akustischen und ethnischen Instrumenten.",
+   "artists": "Bonobo, Jones Meadow, A.M.R"
+  },
+  {
+   "key": "deepprogressivehouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Groovig, melodisch, unaufdringlich – sehr guter Hintergrund zum Arbeiten.",
+   "artists": "Lane 8, Ben Böhmer, Yotto"
+  },
+  {
+   "key": "melodicprogressive",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Melodische Seite des Progressive House, treibender als Deep Progressive.",
+   "artists": "Druce, Gux Jimenez, Lesh"
+  },
+  {
+   "key": "progressive",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Progressive House im Sinne der DJ-Kultur – lange Spannungsbögen, clubtauglich.",
+   "artists": "John Digweed, Eelke Kleijn, Matt Fax"
+  },
+  {
+   "key": "deeptech",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Mischung aus Deep House und Techno: punchy, spacig.",
+   "artists": "Stereofysh, Satori, Dimitri Veimar"
+  },
+  {
+   "key": "techhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Wärme von House trifft Präzision von Techno. Club-Standard.",
+   "artists": "Green Velvet, Solardo, FISHER"
+  },
+  {
+   "key": "minimal",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Reduziert auf das Nötigste – Raum zwischen den Klängen, hypnotisch.",
+   "artists": "Nicolas Barnes, Freddy Hetzinger"
+  },
+  {
+   "key": "tribalhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Percussion im Vordergrund, trommellastig.",
+   "artists": "Dario Nunez, Taito Tikaro, Alex Guesta"
+  },
+  {
+   "key": "soulfulhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "House mit viel Gefühl, Gesang und Soul. Warm.",
+   "artists": "Louie Vega, Dennis Ferrer, Ce Ce Peniston"
+  },
+  {
+   "key": "vocalhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "House mit starken Vocals – soulig bis sexy.",
+   "artists": "Faithless, Sonique, Hot Since 82"
+  },
+  {
+   "key": "funkyhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Funkige Gitarrenlicks und clevere Samples auf 4/4. Gute Laune.",
+   "artists": "Charles J, Block & Crown"
+  },
+  {
+   "key": "discohouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "70er-Disco-Feeling mit moderner House-Kick.",
+   "artists": "Vinylshakerz, Javier Penna"
+  },
+  {
+   "key": "jazzhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "House mit Saxophon, Trompete und jazzigen Grooves.",
+   "artists": "The Layabouts, Kek'star"
+  },
+  {
+   "key": "latinhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Salsa, brasilianische Rhythmen und Latin Jazz auf House-Grooves.",
+   "artists": "Milk & Sugar, Mario Ochoa"
+  },
+  {
+   "key": "summerchillhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Sommerlicher, leichter Tropical-/Chill-House.",
+   "artists": "Sam Feldt, Lost Frequencies"
+  },
+  {
+   "key": "slaphouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Moderner, kommerzieller Deep House mit markantem, \"schlagendem\" Bass (typisch Radio/TikTok).",
+   "artists": "Alok, Dimitri Vegas & Like Mike, MOTi"
+  },
+  {
+   "key": "oldschoolhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "House-Klassiker der späten 80er und 90er aus Chicago und New York.",
+   "artists": "Frankie Knuckles, Marshall Jefferson, Todd Terry"
+  },
+  {
+   "key": "detroithousentechno",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Der Detroit-Sound – die Wiege von Techno, soulig und maschinell.",
+   "artists": "Jeff Mills, Blaze, Agoria"
+  },
+  {
+   "key": "iconycradio",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Kuratiert vom Label ICONYC: Melodic House, Melodic Techno, Dark Disco, Afro House.",
+   "artists": "Dixon, Âme, Ivory"
+  },
+  {
+   "key": "afrohouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Warmer, treibender 4/4-House mit südafrikanischen Wurzeln (Kwaito, Tribal, Deep, Soulful).",
+   "artists": "Manybeat, Emmanuel Jal, Zico House Junkie"
+  },
+  {
+   "key": "bassnjackinhouse",
+   "group": "House",
+   "tempo": "118–128 BPM",
+   "desc": "Funkige bis dreckige, energiegeladene Club-House-Tracks mit Druck im Bass.",
+   "artists": "Croatia Squad, Tocadisco, CVPELLV"
+  },
+  {
+   "key": "nudisco",
+   "group": "Disco, Indie & Swing",
+   "tempo": "100–125 BPM",
+   "desc": "Funk der 70er/80er mit modernen Beats.",
+   "artists": "Pet Shop Boys, Henry Saiz, Keljet"
+  },
+  {
+   "key": "deepnudisco",
+   "group": "Disco, Indie & Swing",
+   "tempo": "100–125 BPM",
+   "desc": "Langsamere, tiefere Nu-Disco – Mid-Tempo, soulig, zum Mitnicken.",
+   "artists": "Poldoore, Flowavez"
+  },
+  {
+   "key": "indiedance",
+   "group": "Disco, Indie & Swing",
+   "tempo": "100–125 BPM",
+   "desc": "Rock'n'Roll-Spirit mit elektronischer Seele – Gitarren trifft Club.",
+   "artists": "Gorgon City, Schiller"
+  },
+  {
+   "key": "indiebeats",
+   "group": "Disco, Indie & Swing",
+   "tempo": "100–125 BPM",
+   "desc": "Entspannte, frische Indie-Elektronik abseits des Clubs, oft mit Gesang.",
+   "artists": "London Grammar, Elderbrook"
+  },
+  {
+   "key": "electroswing",
+   "group": "Disco, Indie & Swing",
+   "tempo": "100–125 BPM",
+   "desc": "Jazz und Swing der 1920er–40er mit Bläsern und modernem Electro-House-Beat.",
+   "artists": "Caravan Palace, Parov Stelar"
+  },
+  {
+   "key": "techno",
+   "group": "Techno",
+   "tempo": "125–150 BPM",
+   "desc": "Moderner Peak-Time-Techno: maschinell, strukturiert, kraftvoll.",
+   "artists": "Charlotte De Witte, Amelie Lens, Adam Beyer"
+  },
+  {
+   "key": "undergroundtechno",
+   "group": "Techno",
+   "tempo": "125–150 BPM",
+   "desc": "Dunkler, roher Techno von Berlin bis Brooklyn.",
+   "artists": "Boston 168, CHPTR, Yan Cook"
+  },
+  {
+   "key": "hardtechno",
+   "group": "Techno",
+   "tempo": "125–150 BPM",
+   "desc": "Harter Warehouse-Techno – aggressiv, kalt, schnell.",
+   "artists": "Niereich, Balrog, H! Dude"
+  },
+  {
+   "key": "dubtechno",
+   "group": "Techno",
+   "tempo": "125–150 BPM",
+   "desc": "Tiefer Techno mit Tape-Delays, viel Hall und kalter Atmosphäre. Sehr gut zum Konzentrieren.",
+   "artists": "Heavenchord, Sascha Dive"
+  },
+  {
+   "key": "oldschoolacid",
+   "group": "Techno",
+   "tempo": "125–150 BPM",
+   "desc": "Alles rund um die quietschende Roland TB-303 – Acid House, Acid Techno, Acid Trance.",
+   "artists": "Solar Quest, Jay Lumen"
+  },
+  {
+   "key": "harddance",
+   "group": "Hard Dance",
+   "tempo": "140–200 BPM",
+   "desc": "Harte Kicks und aggressive Rhythmen – Einstieg in die harte Szene.",
+   "artists": "Wavetraxx, Dizmaster"
+  },
+  {
+   "key": "hardstyle",
+   "group": "Hard Dance",
+   "tempo": "140–200 BPM",
+   "desc": "Verzerrte, pumpende Kicks mit großen Melodien. Stadionsound aus NL.",
+   "artists": "Coone, Ran-D, Warface"
+  },
+  {
+   "key": "hardcore",
+   "group": "Hard Dance",
+   "tempo": "140–200 BPM",
+   "desc": "Die härtesten Bangers, inkl. Happy Hardcore.",
+   "artists": "S3RL, Hixxy, Special D."
+  },
+  {
+   "key": "gabber",
+   "group": "Hard Dance",
+   "tempo": "140–200 BPM",
+   "desc": "Die härteste Techno-Form, sehr schnell, extrem verzerrt.",
+   "artists": "Dr. Peacock, Noize Suppressor"
+  },
+  {
+   "key": "handsup",
+   "group": "Hard Dance",
+   "tempo": "140–200 BPM",
+   "desc": "Hard Dance, Trance und Happy Hardcore zum Arme-Hochreißen – 2000er-Deutschland-Sound.",
+   "artists": "Cascada, DJ Gollum"
+  },
+  {
+   "key": "nightcore",
+   "group": "Hard Dance",
+   "tempo": "140–200 BPM",
+   "desc": "Hochgepitchte Vocals auf Happy-Hardcore-Beats, nonstop hohe Energie.",
+   "artists": "S3RL, Da Tweekaz"
+  },
+  {
+   "key": "drumandbass",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Schnelle Breakbeats und massive Basslines, seit Mitte der 90er.",
+   "artists": "Noisia, DJ Aphrodite, Traffic"
+  },
+  {
+   "key": "liquiddnb",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Die weiche, melodische Seite von DnB – fließend, trotzdem schnell.",
+   "artists": "Netsky, Wilkinson, Technimatic"
+  },
+  {
+   "key": "darkdnb",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Böser, dreckiger DnB mit den dunkelsten Basslines.",
+   "artists": "Gydra, Magnetude"
+  },
+  {
+   "key": "jungle",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Der Vorläufer von DnB: zerhackte Breakbeats, Reggae- und Rave-Einflüsse.",
+   "artists": "Nebula, Kid Lib"
+  },
+  {
+   "key": "drumstep",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Hybrid aus Half-Time-Dubstep und DnB.",
+   "artists": "Virtual Riot, Riot"
+  },
+  {
+   "key": "dubstep",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Wobble-Bass, Party-Beats, große Drops.",
+   "artists": "Ganja White Night, ENiGMA Dubz"
+  },
+  {
+   "key": "clubdubstep",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Clubgetestete, basslastigere Dubstep-Hits.",
+   "artists": "Seven Lions, Au5"
+  },
+  {
+   "key": "liquiddubstep",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Dubstep mit fließendem, DnB-artigem Groove, sanfter.",
+   "artists": "Phaeleh, The Widdler"
+  },
+  {
+   "key": "chillstep",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Dubstep-Rhythmen mit Chillout-Stimmung – entspannt, aber mit Bass.",
+   "artists": "TheFatRat, Mr. Bill"
+  },
+  {
+   "key": "trap",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Aus Südstaaten-Hip-Hop entstanden: 808-Drums, harte Drops.",
+   "artists": "RL Grime, NGHTMRE, Flosstradamus"
+  },
+  {
+   "key": "liquidtrap",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Die sanftere Seite von Trap, mit Hip-Hop-Stimmung.",
+   "artists": "Purity Ring, Sibewest"
+  },
+  {
+   "key": "futurebass",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Wabernde Synth-Akkorde, fette Beats, verspielt und emotional.",
+   "artists": "San Holo, What So Not, CloZee"
+  },
+  {
+   "key": "futuregarage",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "2-Step-Garage-Rhythmen, melancholisch, nächtlich, innovativ.",
+   "artists": "Sibewest, Whitewildbear"
+  },
+  {
+   "key": "glitchhop",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Digitale Störgeräusche und Bitcrusher auf lässigen Hip-Hop-Beats.",
+   "artists": "Stepcat, Defunk"
+  },
+  {
+   "key": "dub",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Bass und Drums im Fokus, Delay-Effekte, rauchige Reggae-Vibes.",
+   "artists": "Panda Dub, Dub Defense"
+  },
+  {
+   "key": "breaks",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Zerhackte Drumloops aus Hip-Hop und UK-Rave, dazu Synths, Samples und Effekte.",
+   "artists": "Mechanical Pressure, Kid Digital"
+  },
+  {
+   "key": "atmosphericbreaks",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Melodische, spacige Breakbeats voller Wärme – zum Wegdriften mit Groove.",
+   "artists": "The Crystal Method, infusion"
+  },
+  {
+   "key": "bigbeat",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "Breakbeats und staubige Samples – die 90er-Bewegung um Chemical Brothers und Fatboy Slim.",
+   "artists": "Lords Of Acid, The Tesla's Method"
+  },
+  {
+   "key": "bassline",
+   "group": "Breaks, Drum & Bass & Bass Music",
+   "tempo": "70–175 BPM",
+   "desc": "UK-Mix aus House, Speed Garage und Techno – alles dreht sich um den Tiefbass.",
+   "artists": "Woo2tech, Majed Salih"
+  },
+  {
+   "key": "chillout",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Ruhige, instrumentale Elektronik – soll die Sinne beruhigen. Kaum Gesang.",
+   "artists": "Zero Cult, AmBeam, Nigel Stanford"
+  },
+  {
+   "key": "chilloutdreams",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Zum Augen-Schließen und Wegdriften – sehr sphärisch.",
+   "artists": "Lisa Gerrard, Sunlounger"
+  },
+  {
+   "key": "ambient",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Atmosphärische Klangflächen ohne Beat-Druck – für tiefe Konzentration.",
+   "artists": "Carbon Based Lifeforms, Klaus Schulze, City Of Dawn"
+  },
+  {
+   "key": "vocalchillout",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Entspannte Songs mit Gesang, gut als Tages-Soundtrack.",
+   "artists": "ATB, Conjure One"
+  },
+  {
+   "key": "chilledm",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "EDM ohne Lautstärke-Krieg – melodisch, entspannt.",
+   "artists": "Petit Biscuit, San Holo, Kasbo"
+  },
+  {
+   "key": "spacemusic",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Ambient-Weltraummusik – Klangflächen, keine Beats. Ideal für Elite Dangerous.",
+   "artists": "David Helpling, City Of Dawn"
+  },
+  {
+   "key": "lounge",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Klassische Lounge-Musik: Schuhe aus, zurücklehnen.",
+   "artists": "Blank & Jones, Cafe Americaine"
+  },
+  {
+   "key": "vocallounge",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Lounge-Grooves mit sanften Vocals.",
+   "artists": "Vargo, SolarFlow"
+  },
+  {
+   "key": "downtempolounge",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Mitnick-Beats und chillige Vocals für den Sonnenuntergang.",
+   "artists": "Lemongrass, The Rhythm Divine"
+  },
+  {
+   "key": "lofiloungenchill",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Lo-Fi-Ästhetik trifft Lounge, sehr ruhig.",
+   "artists": "Ian Ewing, Evil Needle"
+  },
+  {
+   "key": "lofihiphop",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Die bekannten \"Beats to study to\": knisternd, ruhig, entspannt.",
+   "artists": "Tsuki, Eevee"
+  },
+  {
+   "key": "chillhop",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Lo-Fi Hip-Hop, Trip-Hop, Downtempo und Jazz gemischt.",
+   "artists": "Nujabes, Gramatik, Poldoore"
+  },
+  {
+   "key": "chillntropicalhouse",
+   "group": "Chill, Lounge & Ambient",
+   "tempo": "60–110 BPM",
+   "desc": "Entspannter, sonniger Tropical House – zwischen Liegestuhl und Tanzfläche.",
+   "artists": "Kygo, Lost Frequencies, Matoma"
+  },
+  {
+   "key": "edm",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Wo Dance auf Pop trifft: Chart-Crossover und Stadion-Hymnen.",
+   "artists": "David Guetta, Tiësto, The Chainsmokers"
+  },
+  {
+   "key": "edmfestival",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Mainstage-Festival-Sound – Big Room, laut, drop-lastig.",
+   "artists": "Hardwell, Martin Garrix, W&W"
+  },
+  {
+   "key": "bigroomhouse",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Prime-Time-House mit Festival-Energie, alt und neu gemischt.",
+   "artists": "Galantis, Dzeko, Dash Berlin"
+  },
+  {
+   "key": "electro",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Kräftiger, synthlastiger House mit dreckigen Bässen (2008–2015-Ära).",
+   "artists": "Steve Aoki, NERVO, deadmau5"
+  },
+  {
+   "key": "club",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Was in den großen Clubs weltweit läuft – von Prime-Time bis Deep House.",
+   "artists": "David Guetta, Armin van Buuren"
+  },
+  {
+   "key": "russianclubhits",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Aktuelle russisch-/osteuropäische Club- und Pop-Hits.",
+   "artists": "Serebro, Artik & Asti"
+  },
+  {
+   "key": "00sclubhits",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Club-Hits der 2000er – bekannte Hymnen und vergessene Perlen.",
+   "artists": "Faithless, Planet Funk, Miss Jane"
+  },
+  {
+   "key": "umfradio",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Radio des Ultra Music Festival, Mainstage-Sets rund um die Uhr.",
+   "artists": "Carl Cox, Armin van Buuren"
+  },
+  {
+   "key": "djmixes",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Lange DJ-Mixes quer durch Techno, Deep House, Progressive, Trance.",
+   "artists": "verschiedene"
+  },
+  {
+   "key": "eurodance",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Moderner Eurodance: 4/4-Puls, Synths, große Hooks.",
+   "artists": "E-Type, Discotronic"
+  },
+  {
+   "key": "classiceurodance",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "90er-Eurodance pur – der Soundtrack der Bravo Hits.",
+   "artists": "Haddaway, Snap!, Real McCoy"
+  },
+  {
+   "key": "classiceurodisco",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "70er/80er Euro-Disco, italo-lastig.",
+   "artists": "Modern Talking, Sandra, Bad Boys Blue"
+  },
+  {
+   "key": "oldschoolrave",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Trillerpfeifen und Laser: Rave der frühen 90er.",
+   "artists": "The Prodigy, Dune"
+  },
+  {
+   "key": "electropop",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Eingängiger Pop mit Vintage-Synthesizern.",
+   "artists": "Ladytron, Night Club"
+  },
+  {
+   "key": "futuresynthpop",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Futurepop/Synthpop mit Dark-Wave-Einschlag.",
+   "artists": "VNV Nation, Solitary Experiments"
+  },
+  {
+   "key": "synthwave",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "80er-Retro inspiriert von Videospielen und Filmsoundtracks – Neon und Outrun.",
+   "artists": "The Midnight, Carpenter Brut, Volkor X"
+  },
+  {
+   "key": "electronicpioneers",
+   "group": "Pop, Retro & Mainstream",
+   "tempo": "",
+   "desc": "Die Wegbereiter der elektronischen Musik, experimentell bis kosmisch.",
+   "artists": "Kraftwerk, Jean Michel Jarre, Tangerine Dream"
+  }
+ ]
+}
