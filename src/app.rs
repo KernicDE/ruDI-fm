@@ -16,6 +16,7 @@ use crate::config::{Config, State};
 use crate::data::Catalog;
 use crate::nowplaying::{NowPlaying, Publisher, unix_now};
 use crate::player::{Player, PlayerEvent};
+use crate::stats::{self, Entry, Period, Stats};
 
 const NOW_ALL_INTERVAL: Duration = Duration::from_secs(30);
 const HISTORY_MAX_AGE: Duration = Duration::from_secs(60);
@@ -61,6 +62,25 @@ impl Playing {
     }
 }
 
+/// Open statistics screen.
+pub struct StatsView {
+    entries: Vec<Entry>,
+    pub period: usize,
+    /// 0 = Kanäle, 1 = Künstler, 2 = Tracks
+    pub page: usize,
+    pub data: Stats,
+}
+
+impl StatsView {
+    pub fn period(&self) -> Period {
+        Period::ALL[self.period]
+    }
+
+    fn refresh(&mut self) {
+        self.data = stats::aggregate(&self.entries, self.period(), unix_now());
+    }
+}
+
 pub struct App {
     pub cfg: Config,
     pub state: State,
@@ -80,6 +100,13 @@ pub struct App {
     pub list: ListState,
     selected_at: Instant,
     pub show_help: bool,
+    pub stats: Option<StatsView>,
+    /// Heard seconds of the current track, only counted while audio flows.
+    listened: f64,
+    last_tick: Instant,
+    /// Heard seconds per channel key (all time) and today, for favourites order and Discord.
+    listen: HashMap<String, u64>,
+    today_secs: u64,
 
     pub playing: Option<Playing>,
     stream_cache: HashMap<String, Vec<String>>,
@@ -117,6 +144,7 @@ impl App {
         let mut tabs = vec!["Alle".to_string(), "★ Favoriten".to_string()];
         tabs.extend(catalog.moods.iter().map(|(m, _)| m.clone()));
 
+        let (listen, today_secs) = stats::totals(&stats::load(), unix_now());
         let app = App {
             cfg,
             state,
@@ -135,6 +163,11 @@ impl App {
             list: ListState::default(),
             selected_at: Instant::now(),
             show_help: false,
+            stats: None,
+            listened: 0.0,
+            last_tick: Instant::now(),
+            listen,
+            today_secs,
             playing: None,
             stream_cache: HashMap::new(),
             player,
@@ -220,13 +253,10 @@ impl App {
                 rows.push(Row::Channel(i));
             }
         } else if self.tab == 1 {
-            rows.extend(
-                self.channels
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, c)| self.state.favorites.contains(&c.key))
-                    .map(|(i, _)| Row::Channel(i)),
-            );
+            let mut favs: Vec<usize> = (0..self.channels.len()).filter(|&i| self.state.favorites.contains(&self.channels[i].key)).collect();
+            // most listened first (stable: ties keep the list order)
+            favs.sort_by_key(|&i| std::cmp::Reverse(self.listen.get(&self.channels[i].key).copied().unwrap_or(0)));
+            rows.extend(favs.into_iter().map(Row::Channel));
         } else if let Some((_, keys)) = self.catalog.moods.get(self.tab - 2) {
             rows.extend(keys.iter().filter_map(|k| self.channel_by_key(k)).map(Row::Channel));
         }
@@ -285,7 +315,24 @@ impl App {
 
     // ------------------------------------------------------------ playback
 
+    /// Log the track heard so far (if long enough) and reset the counter.
+    fn flush_listen(&mut self) {
+        let secs = std::mem::take(&mut self.listened) as u64;
+        let Some(p) = &self.playing else { return };
+        let (artist, title) = p.artist_title();
+        if secs < stats::MIN_SECS || (artist.is_empty() && title.is_empty()) {
+            return;
+        }
+        let ch = &self.channels[p.channel];
+        let e = Entry { ts: unix_now() - secs as i64, channel_key: ch.key.clone(), channel: ch.name.clone(), artist, title, secs };
+        stats::append(&e);
+        *self.listen.entry(e.channel_key).or_default() += secs;
+        // ponytail: not reset at midnight, a session running across it shows yesterday's total until restart.
+        self.today_secs += secs;
+    }
+
     pub fn play_channel(&mut self, idx: usize) {
+        self.flush_listen();
         let Some(ch) = self.channels.get(idx) else { return };
         let key = ch.key.clone();
         self.state.last_channel = Some(key.clone());
@@ -331,6 +378,7 @@ impl App {
     }
 
     pub fn stop(&mut self) {
+        self.flush_listen();
         let _ = self.player.stop();
         self.playing = None;
     }
@@ -448,6 +496,7 @@ impl App {
             title,
             started: p.heard_start,
             duration: p.track.as_ref().map(|t| t.duration).unwrap_or(0),
+            today_secs: self.today_secs,
             cover_url: p.track.as_ref().and_then(|t| t.art_url.clone()).or_else(|| ch.image.clone()),
         }
     }
@@ -500,6 +549,7 @@ impl App {
             }
             AppEvent::Streams(_, Err(e)) => {
                 self.set_status(format!("Stream-URLs: {e}"));
+                self.listened = 0.0;
                 self.playing = None;
             }
             AppEvent::Player(pe) => self.on_player(pe),
@@ -520,6 +570,11 @@ impl App {
     }
 
     fn on_player(&mut self, ev: PlayerEvent) {
+        if let PlayerEvent::IcyTitle(t) = &ev
+            && self.playing.as_ref().is_some_and(|p| *t != p.icy && !t.is_empty())
+        {
+            self.flush_listen();
+        }
         let Some(p) = self.playing.as_mut() else { return };
         match ev {
             PlayerEvent::IcyTitle(t) => {
@@ -568,6 +623,10 @@ impl App {
 
     /// Periodic work, called every loop iteration.
     pub fn tick(&mut self) {
+        let dt = std::mem::replace(&mut self.last_tick, Instant::now()).elapsed().as_secs_f64();
+        if self.playing.as_ref().is_some_and(|p| p.audio) {
+            self.listened += dt;
+        }
         if self.status.as_ref().is_some_and(|(_, at)| at.elapsed() > STATUS_TTL) {
             self.status = None;
         }
@@ -648,6 +707,10 @@ impl App {
             self.show_help = false;
             return;
         }
+        if self.stats.is_some() {
+            self.on_stats_key(key);
+            return;
+        }
         if self.searching {
             match key.code {
                 KeyCode::Esc => {
@@ -684,6 +747,12 @@ impl App {
                 self.rebuild_rows();
             }
             KeyCode::Char('?') | KeyCode::F(1) => self.show_help = true,
+            KeyCode::Char('S') => {
+                let entries = stats::load();
+                let mut v = StatsView { entries, period: 0, page: 0, data: Stats::default() };
+                v.refresh();
+                self.stats = Some(v);
+            }
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::PageDown => self.move_selection(10),
@@ -740,6 +809,29 @@ impl App {
                 if i < self.tabs.len() {
                     self.set_tab(i);
                 }
+            }
+            _ => {}
+        }
+    }
+
+    fn on_stats_key(&mut self, key: KeyEvent) {
+        let Some(v) = self.stats.as_mut() else { return };
+        let n = Period::ALL.len();
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q' | 'S') => self.stats = None,
+            KeyCode::Tab => v.page = (v.page + 1) % 3,
+            KeyCode::BackTab => v.page = (v.page + 2) % 3,
+            KeyCode::Right | KeyCode::Char('l') => {
+                v.period = (v.period + 1) % n;
+                v.refresh();
+            }
+            KeyCode::Left | KeyCode::Char('h') => {
+                v.period = (v.period + n - 1) % n;
+                v.refresh();
+            }
+            KeyCode::Char(c @ '1'..='5') => {
+                v.period = c as usize - '1' as usize;
+                v.refresh();
             }
             _ => {}
         }

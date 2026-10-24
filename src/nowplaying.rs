@@ -31,6 +31,8 @@ pub struct NowPlaying {
     pub started: i64,
     /// Seconds, 0 = unknown.
     pub duration: i64,
+    /// Seconds heard today (as of the last finished track).
+    pub today_secs: u64,
     /// Remote cover (track art, falls back to channel image).
     pub cover_url: Option<String>,
 }
@@ -115,6 +117,11 @@ fn to_jpeg(bytes: &[u8]) -> Vec<u8> {
 
 const COVER_CACHE: usize = 24;
 
+/// Playback position as heard: seconds since the track started (None when unknown).
+fn track_progress(np: &NowPlaying) -> Option<MediaPosition> {
+    (np.started > 0).then(|| MediaPosition(Duration::from_secs((unix_now() - np.started).max(0) as u64)))
+}
+
 fn publish_loop(
     rx: Receiver<Msg>,
     tx: Sender<Msg>,
@@ -150,13 +157,20 @@ fn publish_loop(
     let mut downloading: Option<String> = None;
     let mut cover_file: Option<PathBuf> = None;
     let mut current = NowPlaying::default();
+    let mut last_discord_retry = std::time::Instant::now();
 
     loop {
-        // Wait for work; wake up periodically to retry Discord and failed cover downloads.
+        // Wait for work; wake up every second to refresh the MPRIS position, and every 15 s
+        // to retry Discord and failed cover downloads.
         let mut msgs = Vec::new();
-        match rx.recv_timeout(Duration::from_secs(15)) {
+        match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(m) => msgs.push(m),
-            Err(mpsc::RecvTimeoutError::Timeout) => discord.set(&current, None),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if last_discord_retry.elapsed() >= Duration::from_secs(15) {
+                    discord.set(&current, None);
+                    last_discord_retry = std::time::Instant::now();
+                }
+            }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
         msgs.extend(rx.try_iter());
@@ -211,6 +225,13 @@ fn publish_loop(
         }
 
         if !np_changed && !cover_changed {
+            // MPRIS clients (playerctl, OBS overlays) read Position as a stored value, so it
+            // must be refreshed while playing, otherwise it stays at the track-start value.
+            if current.playing {
+                if let Some(c) = controls.as_mut() {
+                    let _ = c.set_playback(MediaPlayback::Playing { progress: track_progress(&current) });
+                }
+            }
             continue;
         }
 
@@ -234,9 +255,11 @@ fn publish_loop(
                 cover_url: local.as_deref().or(current.cover_url.as_deref()),
                 duration: (current.duration > 0).then(|| Duration::from_secs(current.duration as u64)),
             });
-            let progress =
-                (current.started > 0).then(|| MediaPosition(Duration::from_secs((unix_now() - current.started).max(0) as u64)));
-            let _ = c.set_playback(if current.playing { MediaPlayback::Playing { progress } } else { MediaPlayback::Stopped });
+            let _ = c.set_playback(if current.playing {
+                MediaPlayback::Playing { progress: track_progress(&current) }
+            } else {
+                MediaPlayback::Stopped
+            });
         }
 
         // Discord loads the cover from the remote URL itself, only text changes matter.
@@ -319,7 +342,10 @@ impl Discord {
         let result = if np.playing {
             let details = if np.title.is_empty() { np.channel.clone() } else { np.title.clone() };
             let state = if np.artist.is_empty() { format!("DI.FM {}", np.channel) } else { np.artist.clone() };
-            let large_text = format!("DI.FM · {}", np.channel);
+            let mut large_text = format!("DI.FM · {}", np.channel);
+            if np.today_secs >= 60 {
+                large_text += &format!(" · heute {} gehört", crate::stats::fmt_dur(np.today_secs));
+            }
             let mut assets = Assets::new().large_text(&large_text);
             if let Some(url) = np.cover_url.as_deref() {
                 assets = assets.large_image(url);

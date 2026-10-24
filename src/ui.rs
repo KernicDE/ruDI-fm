@@ -2,11 +2,12 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, BorderType, Borders, Clear, LineGauge, List, ListItem, Padding, Paragraph, Tabs, Wrap};
+use ratatui::widgets::{Bar, BarChart, BarGroup, Block, BorderType, Borders, Clear, LineGauge, List, ListItem, Padding, Paragraph, Sparkline, Tabs, Wrap};
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, Row};
 use crate::nowplaying::unix_now;
+use crate::stats::fmt_dur;
 
 const ACCENT: Color = Color::Rgb(63, 169, 245);
 const ACCENT_DIM: Color = Color::Rgb(30, 80, 120);
@@ -56,6 +57,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     if app.show_help {
         draw_help(f);
+    }
+    if app.stats.is_some() {
+        draw_stats(f, app);
     }
 }
 
@@ -340,7 +344,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
 fn draw_help(f: &mut Frame) {
     let area = f.area();
     let w = 62.min(area.width);
-    let h = 24.min(area.height);
+    let h = 25.min(area.height);
     let popup = Rect::new((area.width - w) / 2, (area.height - h) / 2, w, h);
     let keys = [
         ("↑/↓  j/k", "Kanal wählen"),
@@ -356,6 +360,7 @@ fn draw_help(f: &mut Frame) {
         ("/", "Suche (Name, Beschreibung, Artists, Genre)"),
         ("Esc", "Suche beenden"),
         ("Tab / 1–6", "Liste: Alle, Favoriten, Stimmungen"),
+        ("S", "Hörstatistik (Tab Seite, ←/→ Zeitraum)"),
         ("q", "Beenden"),
     ];
     let mut lines: Vec<Line> = keys
@@ -367,4 +372,97 @@ fn draw_help(f: &mut Frame) {
     lines.push(Line::from(Span::styled("OBS: Browserquelle http://127.0.0.1:<port>/", Style::new().fg(MUTED))));
     f.render_widget(Clear, popup);
     f.render_widget(Paragraph::new(lines).block(block("Hilfe · beliebige Taste schließt").padding(Padding::uniform(1))), popup);
+}
+
+fn draw_stats(f: &mut Frame, app: &App) {
+    let Some(v) = &app.stats else { return };
+    let (d, now) = (&v.data, unix_now());
+    let area = f.area();
+    f.render_widget(Clear, area);
+    let blk = block("Hörstatistik · Tab Seite · ←/→ Zeitraum · Esc zurück");
+    let inner = blk.inner(area);
+    f.render_widget(blk, area);
+
+    let [sum, periods, pages, list, charts] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Min(5),
+        Constraint::Length(7),
+    ])
+    .areas(inner);
+
+    let favourite = d.channels.first().map(|c| c.0.as_str()).unwrap_or("–");
+    let kv = |k: &str, val: String| [Span::styled(format!("{k} "), Style::new().fg(MUTED)), Span::styled(format!("{val}   "), Style::new().fg(FG).bold())];
+    let line: Vec<Span> = [
+        kv("Hörzeit", fmt_dur(d.secs)),
+        kv("Tracks", d.tracks.to_string()),
+        kv("Längste Session", fmt_dur(d.longest_session)),
+        kv("Serie", format!("{} Tage", d.streak)),
+        kv("Lieblingskanal", favourite.to_string()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    f.render_widget(Paragraph::new(Line::from(line)).wrap(Wrap { trim: true }), sum);
+
+    let tab_style = Style::new().fg(ACCENT).bold().add_modifier(Modifier::UNDERLINED);
+    f.render_widget(
+        Tabs::new(crate::stats::Period::ALL.iter().map(|p| Line::from(p.label(now))))
+            .select(v.period)
+            .style(Style::new().fg(MUTED))
+            .highlight_style(tab_style)
+            .divider(Span::styled("│", Style::new().fg(ACCENT_DIM))),
+        periods,
+    );
+    f.render_widget(
+        Tabs::new(["Kanäle", "Künstler", "Tracks"].map(Line::from))
+            .select(v.page)
+            .style(Style::new().fg(MUTED))
+            .highlight_style(tab_style)
+            .divider(Span::styled("│", Style::new().fg(ACCENT_DIM))),
+        pages,
+    );
+
+    let ranking = [&d.channels, &d.artists, &d.top_tracks][v.page];
+    let top = ranking.first().map(|r| r.1).unwrap_or(0).max(1);
+    let note_w = if v.page == 0 { 0 } else { (list.width as usize / 4).clamp(8, 28) };
+    let name_w = (list.width as usize).saturating_sub(34 + note_w).clamp(10, 60);
+    let rows: Vec<Line> = ranking
+        .iter()
+        .take(list.height as usize)
+        .enumerate()
+        .map(|(i, (name, secs, n, chans))| {
+            let shown: String = name.chars().take(name_w).collect();
+            Line::from(vec![
+                Span::styled(format!("{:>2} ", i + 1), Style::new().fg(MUTED)),
+                Span::styled(format!("{shown:<name_w$} "), Style::new().fg(FG)),
+                Span::styled(format!("{:>8} ", fmt_dur(*secs)), Style::new().fg(GOLD)),
+                Span::styled(format!("{n:>4}x "), Style::new().fg(MUTED)),
+                Span::styled("█".repeat((*secs * 12 / top) as usize), Style::new().fg(ACCENT)),
+                Span::styled(format!(" {}", chans.chars().take(note_w).collect::<String>()), Style::new().fg(MUTED)),
+            ])
+        })
+        .collect();
+    let empty = || vec![Line::from(Span::styled("Keine Daten in diesem Zeitraum.", Style::new().fg(MUTED)))];
+    f.render_widget(Paragraph::new(if rows.is_empty() { empty() } else { rows }), list);
+
+    let [hours, days] = Layout::horizontal([Constraint::Length(50), Constraint::Min(16)]).areas(charts);
+    let bars: Vec<Bar> = d
+        .hours
+        .iter()
+        .enumerate()
+        .map(|(h, s)| Bar::default().value(*s).label(Line::from(format!("{h:02}"))).text_value(String::new()))
+        .collect();
+    f.render_widget(
+        BarChart::default()
+            .block(block("Tageszeit"))
+            .data(BarGroup::default().bars(&bars))
+            .bar_width(2)
+            .bar_gap(0)
+            .bar_style(Style::new().fg(ACCENT))
+            .label_style(Style::new().fg(MUTED)),
+        hours,
+    );
+    f.render_widget(Sparkline::default().block(block("Letzte 14 Tage")).data(d.days).style(Style::new().fg(GOLD)), days);
 }

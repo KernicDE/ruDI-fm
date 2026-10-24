@@ -4,6 +4,7 @@ mod config;
 mod data;
 mod nowplaying;
 mod player;
+mod stats;
 mod ui;
 
 use std::collections::HashMap;
@@ -34,6 +35,16 @@ pub enum AppEvent {
 fn main() -> Result<()> {
     if std::env::args().any(|a| a == "--version" || a == "-V") {
         println!("ruDI.FM {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).is_some_and(|a| a == "stats") {
+        let entries = stats::load();
+        match args.get(2).map(String::as_str) {
+            Some("--csv") => stats::print_csv(&entries),
+            Some("--json") => println!("{}", serde_json::to_string_pretty(&entries)?),
+            _ => stats::print_summary(&entries),
+        }
         return Ok(());
     }
     let cfg = match Config::load() {
