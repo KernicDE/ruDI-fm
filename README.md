@@ -56,10 +56,18 @@ Favoriten, letzter Kanal und Lautstärke liegen in `~/.local/state/rudi-fm/state
 | `f` | Favorit an/aus |
 | `/` | Suche in Name, Beschreibung, Artists, Genres (`Esc` beendet) |
 | `Tab`, `1`–`6` | Liste: Alle, Favoriten, Stimmungen |
+| `S` | Hörstatistik (`Tab` Seite, `←/→` oder `1`–`5` Zeitraum, `Esc` zurück) |
 | `?` | Hilfe |
 | `q` | Beenden |
 
 Pause gibt es bewusst nicht: Bei Live-Radio würde ein pausierter Stream danach zeitversetzt weiterlaufen, deshalb ist es Start/Stop.
+
+## Hörstatistik
+
+Jeder Track, der mindestens 30 s gehört wurde (nur bei laufendem Audio), landet in `~/.local/state/rudi-fm/history.jsonl`.
+- `S` öffnet die Auswertung: Kanäle, Künstler, Tracks nach Hörzeit, Zeiträume Heute/7 Tage/30 Tage/Jahr (Rückblick)/Gesamt, längste Session, Serie, Tageszeit-Verteilung, letzte 14 Tage.
+- `rudi-fm stats` gibt die Zusammenfassung im Terminal aus, `--csv` / `--json` exportieren das Rohlog.
+- Die Favoriten-Liste ist nach Hörzeit sortiert, Discord zeigt die heute gehörte Zeit.
 
 ## Now-Playing nach außen
 
@@ -99,7 +107,9 @@ src/
   app.rs          Zustand, Tasten, Wiedergabe, Titelabgleich ICY ↔ API
   ui.rs           ratatui-Oberfläche
   api.rs          AudioAddict-API (Kanäle, Now-Playing, Verlauf, Stream-URLs)
+  config.rs       Pfade, config.toml, Listen-Key, Favoriten/Zustand
   player.rs       mpv über JSON-IPC
+  stats.rs        Hörstatistik (history.jsonl, Auswertung, Export)
   nowplaying.rs   MPRIS, Discord, OBS-Dateien und -Webserver
   data.rs         eingebettete deutsche Kanaldaten
   overlay.html    OBS-Browserquelle
