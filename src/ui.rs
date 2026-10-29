@@ -63,8 +63,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     // short terminals fall back to the one-line player
     let mini = app.mini || f.area().height < 24;
     let bar_h = if mini { 1 } else { 5 };
-    let [header, body, bar, hints] =
-        Layout::vertical([Constraint::Length(1), Constraint::Min(5), Constraint::Length(bar_h), Constraint::Length(1)]).areas(f.area());
+    // blank row between player and key hints, except in the one-line player
+    let gap = if mini { 0 } else { 1 };
+    let [header, body, bar, _, hints] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(5),
+        Constraint::Length(bar_h),
+        Constraint::Length(gap),
+        Constraint::Length(1),
+    ])
+    .areas(f.area());
 
     draw_header(f, app, header);
 
