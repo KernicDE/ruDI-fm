@@ -157,6 +157,8 @@ pub struct App {
     last_click: Option<(Instant, usize)>,
     selected_at: Instant,
     pub show_help: bool,
+    /// One-line player.
+    pub mini: bool,
     pub stats: Option<StatsView>,
     /// Heard seconds of the current track, only counted while audio flows.
     listened: f64,
@@ -223,6 +225,7 @@ impl App {
             last_click: None,
             selected_at: Instant::now(),
             show_help: false,
+            mini: false,
             stats: None,
             listened: 0.0,
             last_tick: Instant::now(),
@@ -673,6 +676,9 @@ impl App {
             AppEvent::Player(pe) => self.on_player(pe),
             AppEvent::Media(me) => self.on_media(me),
             AppEvent::Discord(ok) => {
+                if !ok && self.discord != Some(false) {
+                    self.set_status(tr("Discord Rich Presence nicht verbunden", "Discord Rich Presence not connected"));
+                }
                 self.discord = Some(ok);
             }
             AppEvent::Status(s) => self.set_status(s),
@@ -879,6 +885,7 @@ impl App {
                 self.rebuild_rows();
             }
             KeyCode::Char('?') | KeyCode::F(1) => self.show_help = true,
+            KeyCode::Char('m') => self.mini = !self.mini,
             KeyCode::Char('S') => {
                 let entries = stats::load();
                 let mut v = StatsView { entries, period: 0, page: 0, data: Stats::default() };
