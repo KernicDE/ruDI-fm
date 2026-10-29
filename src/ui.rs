@@ -61,8 +61,8 @@ fn ago(started: i64) -> String {
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     // short terminals fall back to the one-line player
-    let mini = app.mini || f.area().height < 22;
-    let bar_h = if mini { 1 } else { 4 };
+    let mini = app.mini || f.area().height < 24;
+    let bar_h = if mini { 1 } else { 5 };
     let [header, body, bar, hints] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(5), Constraint::Length(bar_h), Constraint::Length(1)]).areas(f.area());
 
@@ -144,6 +144,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     if app.rows.is_empty() {
         let msg = match (app.search.is_empty(), app.tab) {
             (true, 1) => tr("Noch keine Favoriten – mit f markieren.", "No favorites yet – press f to add."),
+            (true, 2) if app.shows_loading => tr("Lade Shows …", "Loading shows …"),
             (true, 2) => tr("Keine Shows geladen.", "No shows loaded."),
             _ => tr("Keine Treffer.", "No matches."),
         };
@@ -204,7 +205,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, area, &mut app.list);
 }
 
-const BTN_W: u16 = 5;
+const BTN_W: u16 = 4;
 const VOL_BAR: u16 = 12;
 
 /// Areas of the transport row; kept pure so tests can check every terminal width.
@@ -268,13 +269,13 @@ fn draw_player(f: &mut Frame, app: &mut App, area: Rect, mini: bool) {
     let blk = Block::default().borders(Borders::TOP).border_style(Style::new().fg(ACCENT_DIM));
     let inner = blk.inner(area);
     f.render_widget(blk, area);
-    let [cover, _, text] = Layout::horizontal([Constraint::Length(6), Constraint::Length(2), Constraint::Min(10)]).areas(inner);
+    let [cover, _, text] = Layout::horizontal([Constraint::Length(8), Constraint::Length(2), Constraint::Min(10)]).areas(inner);
     if let Some(proto) = app.cover.as_mut() {
         f.render_stateful_widget(StatefulImage::default().resize(Resize::Fit(None)), cover, proto);
     } else {
-        f.render_widget(Paragraph::new("\n♪").alignment(Alignment::Center).fg(ACCENT_DIM), cover);
+        f.render_widget(Paragraph::new("\n\n♪").alignment(Alignment::Center).fg(ACCENT_DIM), cover);
     }
-    let [r0, r1, r2] = Layout::vertical([Constraint::Length(1); 3]).areas(text);
+    let [r0, r1, r1b, r2] = Layout::vertical([Constraint::Length(1); 4]).areas(text);
 
     let mut head = vec![];
     if let Some(p) = &app.playing {
@@ -291,7 +292,9 @@ fn draw_player(f: &mut Frame, app: &mut App, area: Rect, mini: bool) {
         f.render_widget(Line::from(Span::styled(format!("▲ {}  ▼ {}", t.votes_up, t.votes_down), Style::new().fg(MUTED))).alignment(Alignment::Right), r0);
     }
     if playing {
-        f.render_widget(Span::styled(marquee(&heard, r1.width as usize), Style::new().fg(FG).bold()), r1);
+        let title = if np.title.is_empty() { "…" } else { np.title.as_str() };
+        f.render_widget(Span::styled(marquee(title, r1.width as usize), Style::new().fg(FG).bold()), r1);
+        f.render_widget(Span::styled(marquee(&np.artist, r1b.width as usize), Style::new().fg(MUTED)), r1b);
     } else {
         f.render_widget(
             Span::styled(tr("Enter spielt den gewählten Kanal · Leertaste setzt fort", "Enter plays the selected channel · Space resumes"), Style::new().fg(MUTED)),
@@ -661,6 +664,7 @@ mod tests {
                 assert!(r.is_empty() || row.intersection(*r) == *r, "width {w}: {r:?} leaves {row:?}");
             }
             assert!(c.gauge.width == 0 || c.gauge.right() <= c.vol.x, "width {w}: gauge overlaps volume");
+            assert!(c.btn.windows(2).all(|b| b[0].right() <= b[1].x), "width {w}: buttons overlap");
             if w >= 24 {
                 assert!(c.btn.iter().all(|b| b.width == super::BTN_W), "width {w}: button clipped");
                 assert!(c.btn[2].right() <= c.vol.x, "width {w}: buttons overlap volume");

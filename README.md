@@ -62,7 +62,7 @@ Favoriten, letzter Kanal und Lautstärke liegen in `~/.local/state/rudi-fm/state
 | `m` | Mini-Player (eine Zeile) |
 | `S` | Hörstatistik (`Tab` Seite, `←/→` oder `1`–`5` Zeitraum, `Esc` zurück) |
 | `?` | Hilfe |
-| Maus | Klick auf Kanal wählt, Doppelklick spielt, Tab, Knöpfe Zurück/Start-Stop/Weiter, Lautstärkebalken (auch ziehen); Mausrad scrollt die Liste bzw. ändert über dem Player die Lautstärke |
+| Maus | Klick auf Kanal wählt, Doppelklick spielt (bei Shows nur laufende; kommende mit Enter), Tab, Knöpfe Zurück/Start-Stop/Weiter, Lautstärkebalken (auch ziehen); Mausrad scrollt die Liste bzw. ändert über dem Player die Lautstärke |
 | `q` | Beenden |
 
 Pause gibt es bewusst nicht: Bei Live-Radio würde ein pausierter Stream danach zeitversetzt weiterlaufen, deshalb ist es Start/Stop.

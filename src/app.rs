@@ -144,6 +144,7 @@ pub struct App {
     pub show_desc: HashMap<String, String>,
     show_desc_pending: Option<String>,
     pub loading: bool,
+    pub shows_loading: bool,
     pub history: HashMap<u64, (Instant, Vec<Track>)>,
     history_pending: Option<u64>,
 
@@ -215,6 +216,7 @@ impl App {
             show_desc: HashMap::new(),
             show_desc_pending: None,
             loading: true,
+            shows_loading: true,
             history: HashMap::new(),
             history_pending: None,
             tabs,
@@ -664,6 +666,7 @@ impl App {
                 }
             }
             AppEvent::Shows(Ok(list)) => {
+                self.shows_loading = false;
                 self.shows = list;
                 self.shows_at = Instant::now();
                 self.rebuild_rows();
@@ -674,7 +677,10 @@ impl App {
                 }
                 self.show_desc.insert(slug, text);
             }
-            AppEvent::Shows(Err(e)) => self.set_status(format!("{} {e}", tr("Shows nicht ladbar:", "Could not load shows:"))),
+            AppEvent::Shows(Err(e)) => {
+                self.shows_loading = false;
+                self.set_status(format!("{} {e}", tr("Shows nicht ladbar:", "Could not load shows:")));
+            }
             AppEvent::Channels(Err(e)) => {
                 self.loading = false;
                 self.set_status(format!("{} {e}", tr("Kanalliste nicht ladbar:", "Could not load channels:")));
@@ -1030,18 +1036,19 @@ impl App {
             }
         } else if h.list.contains(pos) {
             let idx = self.list.offset() + (pos.y - h.list.y) as usize;
-            let chan = match self.rows.get(idx) {
-                Some(Row::Channel(c)) => Some(*c),
-                Some(Row::Show(s)) => self.show_channel(*s),
-                _ => None,
+            // double-click plays channels and live shows; upcoming shows only select (Enter plays)
+            let (selectable, play) = match self.rows.get(idx) {
+                Some(Row::Channel(c)) => (true, Some(*c)),
+                Some(Row::Show(s)) => (true, if idx < self.plan_start { self.show_channel(*s) } else { None }),
+                _ => (false, None),
             };
-            if let Some(c) = chan {
+            if selectable {
                 self.searching = false;
                 self.list.select(Some(idx));
                 self.selected_at = Instant::now();
                 let double = self.last_click.is_some_and(|(t, i)| i == idx && t.elapsed() < DOUBLE_CLICK);
                 self.last_click = if double { None } else { Some((Instant::now(), idx)) };
-                if double {
+                if let (true, Some(c)) = (double, play) {
                     self.activate(c);
                 }
             }
