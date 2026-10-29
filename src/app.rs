@@ -23,6 +23,7 @@ const NOW_ALL_INTERVAL: Duration = Duration::from_secs(30);
 const HISTORY_MAX_AGE: Duration = Duration::from_secs(60);
 const SELECT_DEBOUNCE: Duration = Duration::from_millis(350);
 const STATUS_TTL: Duration = Duration::from_secs(6);
+const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 const MATCH_RETRY: Duration = Duration::from_millis(1500);
 
 /// Clickable areas of the last drawn frame, filled by `ui::draw`.
@@ -111,6 +112,7 @@ pub struct App {
     pub rows: Vec<Row>,
     pub list: ListState,
     pub hits: Hits,
+    last_click: Option<(Instant, usize)>,
     selected_at: Instant,
     pub show_help: bool,
     pub stats: Option<StatsView>,
@@ -175,6 +177,7 @@ impl App {
             rows: Vec::new(),
             list: ListState::default(),
             hits: Hits::default(),
+            last_click: None,
             selected_at: Instant::now(),
             show_help: false,
             stats: None,
@@ -879,7 +882,11 @@ impl App {
                 self.searching = false;
                 self.list.select(Some(idx));
                 self.selected_at = Instant::now();
-                self.play_channel(c);
+                let double = self.last_click.is_some_and(|(t, i)| i == idx && t.elapsed() < DOUBLE_CLICK);
+                self.last_click = if double { None } else { Some((Instant::now(), idx)) };
+                if double {
+                    self.play_channel(c);
+                }
             }
         }
     }

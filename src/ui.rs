@@ -202,12 +202,9 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
     } else {
         lines.push(Line::from(Span::styled("Nichts läuft.", Style::new().fg(MUTED))));
         lines.push(Line::default());
-        lines.push(Line::from(vec![
-            Span::styled("Enter", Style::new().fg(ACCENT).bold()),
-            Span::styled(" Kanal abspielen · ", Style::new().fg(MUTED)),
-            Span::styled("Leertaste", Style::new().fg(ACCENT).bold()),
-            Span::styled(" letzten Kanal fortsetzen", Style::new().fg(MUTED)),
-        ]));
+        for (k, d) in [("Enter / Doppelklick", " Kanal abspielen"), ("Leertaste", " letzten Kanal fortsetzen")] {
+            lines.push(Line::from(vec![Span::styled(k, Style::new().fg(ACCENT).bold()), Span::styled(d, Style::new().fg(MUTED))]));
+        }
     }
 
     let [text, _, gauge, ctl, vol] = Layout::vertical([
@@ -238,10 +235,11 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
     let mut x = ctl.x;
     let mut spans = Vec::new();
     for (i, l) in labels.iter().enumerate() {
-        let w = l.chars().count() as u16;
+        // equal width, so Start/Stop does not shift its neighbours
+        let w = 11u16;
         app.hits.ctl[i] = Rect::new(x, ctl.y, w, 1).intersection(ctl);
         x += w + 3;
-        spans.push(Span::styled(*l, Style::new().fg(ACCENT).bold()));
+        spans.push(Span::styled(format!("{l:^11}"), Style::new().fg(ACCENT).bold()));
         spans.push(Span::raw("   "));
     }
     f.render_widget(Line::from(spans), ctl);
@@ -387,7 +385,7 @@ fn draw_help(f: &mut Frame) {
         ("Esc", "Suche beenden"),
         ("Tab / 1–6", "Liste: Alle, Favoriten, Stimmungen"),
         ("S", "Hörstatistik (Tab Seite, ←/→ Zeitraum)"),
-        ("Maus", "Klick, Rad: Liste, Tabs, Knöpfe, Vol"),
+        ("Maus", "Klick wählt, Doppelklick spielt, Rad"),
         ("q", "Beenden"),
     ];
     let mut lines: Vec<Line> = keys
