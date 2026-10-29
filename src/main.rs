@@ -59,6 +59,7 @@ fn main() -> Result<()> {
         }
     };
     let state = State::load();
+    check_mpv();
 
     let mut terminal = ratatui::init();
     // Graphics protocol (Kitty, Sixel, …) must be queried after entering the alternate screen.
@@ -71,6 +72,28 @@ fn main() -> Result<()> {
     let result = run(&mut terminal, cfg, state, picker);
     ratatui::restore();
     result
+}
+
+/// Exit with an install hint before the TUI starts if mpv is missing.
+fn check_mpv() {
+    let ok = std::process::Command::new("mpv")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success());
+    if ok {
+        return;
+    }
+    let hint = if cfg!(target_os = "macos") {
+        "brew install mpv"
+    } else if cfg!(target_os = "windows") {
+        "winget install mpv"
+    } else {
+        "Paketmanager der Distribution, z. B. `sudo pacman -S mpv` oder `sudo apt install mpv`"
+    };
+    eprintln!("ruDI.FM braucht mpv für die Wiedergabe, es wurde aber nicht gefunden (PATH).\nInstallieren: {hint}");
+    std::process::exit(1);
 }
 
 fn run(terminal: &mut ratatui::DefaultTerminal, cfg: Config, state: State, picker: Picker) -> Result<()> {
