@@ -5,7 +5,7 @@ Schlanker Terminal-Player für DI.FM Premium, geschrieben in Rust (ratatui + mpv
 - Alle 101 aktiven DI.FM-Kanäle, gruppiert nach Stilrichtung, mit deutschen Beschreibungen, Tempo und typischen Artists
 - Aktueller Titel aller Kanäle direkt in der Liste, Verlauf pro Kanal
 - Cover im Terminal (Kitty-Grafikprotokoll, sonst Halbblöcke)
-- Favoriten, Suche, Shows (Live Shows und Show Plan mit lokalen Sendezeiten; Enter spielt den Kanal der Show)
+- Favoriten, Suche, Shows (eine Übersicht: Jetzt live, dann nach Tagen mit lokalen Sendezeiten; Enter spielt den Kanal der Show direkt)
 - Automatischer Serverwechsel bei Stream-Abbruch (3 Spiegelserver) und Neuverbindung
 - Now-Playing nach außen: MPRIS, Discord Rich Presence, Dateien und Web-Overlay für OBS
 - Automatischer Build für Linux, macOS und Windows bei jedem Push auf `master` (Release `latest`); Updater: `rudi-fm update` (Hinweis beim Start, wenn ein neuerer Build vorliegt; nicht in lokal gebauten Versionen)
@@ -57,7 +57,9 @@ Favoriten, letzter Kanal und Lautstärke liegen in `~/.local/state/rudi-fm/state
 | `+` / `-` | Lautstärke |
 | `f` | Favorit an/aus |
 | `/` | Suche in Name, Beschreibung, Artists, Genres (`Esc` beendet) |
-| `Tab`, `1`–`4` | Liste: Alle, Favoriten, Live Shows, Show Plan |
+| `Tab`, `1`–`3` | Liste: Alle, Favoriten, Shows |
+| `t`, `[`, `]` | Shows: jetzt, voriger bzw. nächster Tag |
+| `m` | Mini-Player (eine Zeile) |
 | `S` | Hörstatistik (`Tab` Seite, `←/→` oder `1`–`5` Zeitraum, `Esc` zurück) |
 | `?` | Hilfe |
 | Maus | Klick auf Kanal wählt, Doppelklick spielt, Tab, Knöpfe Zurück/Start-Stop/Weiter, Lautstärkebalken (auch ziehen); Mausrad scrollt die Liste bzw. ändert über dem Player die Lautstärke |

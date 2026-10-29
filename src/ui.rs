@@ -68,13 +68,20 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     draw_header(f, app, header);
 
-    let list_w = if app.tab >= 2 && app.search.is_empty() { 58 } else { 34 };
-    let [left, right] = Layout::horizontal([Constraint::Length(list_w), Constraint::Min(30)]).areas(body);
-    draw_list(f, app, left);
-
-    if app.tab >= 2 && app.search.is_empty() {
-        draw_show(f, app, right);
+    if app.tab == 2 {
+        // wide: list | detail; narrow: list above detail
+        let (list, detail) = if body.width >= 110 {
+            let [l, d] = Layout::horizontal([Constraint::Min(50), Constraint::Length(46)]).areas(body);
+            (l, d)
+        } else {
+            let [l, d] = Layout::vertical([Constraint::Min(6), Constraint::Length(12)]).areas(body);
+            (l, d)
+        };
+        draw_list(f, app, list);
+        draw_show(f, app, detail);
     } else {
+        let [left, right] = Layout::horizontal([Constraint::Length(34), Constraint::Min(30)]).areas(body);
+        draw_list(f, app, left);
         let [info, hist] = Layout::vertical([Constraint::Length(14), Constraint::Min(6)]).areas(right);
         draw_info(f, app, info);
         draw_history(f, app, hist);
@@ -108,7 +115,7 @@ fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
             r
         })
         .collect();
-    let selected = if app.search.is_empty() && !app.searching { Some(app.tab) } else { None };
+    let selected = if app.tab == 2 || (app.search.is_empty() && !app.searching) { Some(app.tab) } else { None };
     f.render_widget(
         Tabs::new(titles)
             .select(selected)
@@ -124,7 +131,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         format!("{} {}{}", tr("Suche:", "Search:"), app.search, if app.searching { "▏" } else { "" })
     } else {
         let n = app.rows.iter().filter(|r| r.is_item()).count();
-        let unit = if app.tab >= 2 { tr("Shows", "shows") } else { tr("Kanäle", "channels") };
+        let unit = if app.tab == 2 { tr("Shows", "shows") } else { tr("Kanäle", "channels") };
         format!("{} · {n} {unit}", app.tabs[app.tab])
     };
     let blk = block(&title);
@@ -137,8 +144,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     if app.rows.is_empty() {
         let msg = match (app.search.is_empty(), app.tab) {
             (true, 1) => tr("Noch keine Favoriten – mit f markieren.", "No favorites yet – press f to add."),
-            (true, 2) => tr("Gerade läuft keine Show.", "No show is live right now."),
-            (true, 3) => tr("Keine Shows geladen.", "No shows loaded."),
+            (true, 2) => tr("Keine Shows geladen.", "No shows loaded."),
             _ => tr("Keine Treffer.", "No matches."),
         };
         f.render_widget(Paragraph::new(msg).fg(MUTED).block(blk), area);
@@ -151,7 +157,8 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = app
         .rows
         .iter()
-        .map(|r| match r {
+        .enumerate()
+        .map(|(row_idx, r)| match r {
             Row::Header(g) => ListItem::new(Line::from(Span::styled(
                 format!("── {g} "),
                 Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
@@ -160,26 +167,18 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
                 let sh = &app.shows[*si];
                 let ch = app.channels.iter().position(|c| c.id == sh.channel_id);
                 let is_playing = ch.is_some() && playing == ch;
-                let marker = if is_playing {
-                    Span::styled("▶ ", Style::new().fg(OK).bold())
-                } else if sh.live {
-                    Span::styled("● ", Style::new().fg(OK))
-                } else {
-                    Span::raw("  ")
-                };
-                // live tab: next slot with weekday; plan tab: day is in the header
-                let when = match (app.tab, sh.next_start) {
-                    (_, 0) => String::new(),
-                    (2, t) => format!("{} {} {}", crate::app::weekday(t), crate::app::date(t), crate::app::hm(t)),
-                    (_, t) => crate::app::hm(t),
-                };
-                let chan = ch.map(|c| app.channels[c].name.as_str()).unwrap_or_default();
-                let name_style = if sh.live { Style::new().fg(OK).bold() } else { Style::new().fg(FG) };
+                let in_live = row_idx < app.plan_start;
+                let marker = if is_playing { Span::styled("▶ ", Style::new().fg(OK).bold()) } else { Span::raw("  ") };
+                let (when, when_style) = if in_live { ("LIVE".to_string(), Style::new().fg(OK).bold()) } else { (crate::app::hm(sh.next_start), Style::new().fg(MUTED)) };
+                let avail = area.width.saturating_sub(2) as usize;
+                let name_w = (avail * 2 / 5).clamp(12, 32).min(avail.saturating_sub(12));
+                let rest_w = avail.saturating_sub(2 + 6 + name_w + 1);
+                let name_style = if in_live { Style::new().fg(OK).bold() } else { Style::new().fg(FG) };
                 ListItem::new(Line::from(vec![
                     marker,
-                    Span::styled(format!("{when:<16}"), Style::new().fg(MUTED)),
-                    Span::styled(sh.name.clone(), name_style),
-                    Span::styled(format!("  {} · {chan}", sh.tagline), Style::new().fg(MUTED)),
+                    Span::styled(format!("{when:<6}"), when_style),
+                    Span::styled(fit(&sh.name, name_w), name_style),
+                    Span::styled(format!(" {}", fit(&sh.tagline, rest_w)), Style::new().fg(MUTED)),
                 ]))
             }
             Row::Channel(i) => {
@@ -343,24 +342,24 @@ fn draw_show(f: &mut Frame, app: &App, area: Rect) {
         f.render_widget(block(tr("Show", "Show")), area);
         return;
     };
-    let label = |s: &'static str| Span::styled(s, Style::new().fg(MUTED));
     let chan = app.channels.iter().find(|c| c.id == sh.channel_id).map_or("", |c| c.name.as_str());
+    let width = area.width.saturating_sub(4) as usize;
     let mut text = Text::default();
-    text.push_line(Line::from(vec![Span::styled(sh.tagline.clone(), Style::new().fg(ACCENT)), Span::styled(format!(" · {chan}"), Style::new().fg(MUTED))]));
+    text.push_line(Line::from(Span::styled(sh.tagline.clone(), Style::new().fg(ACCENT))));
     if sh.live {
         text.push_line(Line::from(Span::styled(tr("● Läuft gerade", "● Live now"), Style::new().fg(OK).bold())));
     }
+    text.push_line(Line::default());
+    text.extend(labeled(tr("Kanal:", "Channel:"), chan, width));
     if sh.next_start > 0 {
-        text.push_line(Line::from(vec![
-            label(tr("Nächste Sendung: ", "Next broadcast: ")),
-            Span::styled(format!("{} {} {}", crate::app::weekday(sh.next_start), crate::app::date(sh.next_start), crate::app::hm(sh.next_start)), Style::new().fg(FG)),
-        ]));
+        let next = format!("{} {} {}", crate::app::weekday(sh.next_start), crate::app::date(sh.next_start), crate::app::hm(sh.next_start));
+        text.extend(labeled(tr("Nächste Sendung:", "Next broadcast:"), &next, width));
     }
     if !sh.schedule.is_empty() {
-        text.push_line(Line::from(vec![label(tr("Rhythmus:        ", "Schedule:        ")), Span::styled(sh.schedule.clone(), Style::new().fg(FG))]));
+        text.extend(labeled(tr("Rhythmus:", "Schedule:"), &sh.schedule, width));
     }
     if sh.episodes > 0 {
-        text.push_line(Line::from(vec![label(tr("Episoden:        ", "Episodes:        ")), Span::styled(sh.episodes.to_string(), Style::new().fg(FG))]));
+        text.extend(labeled(tr("Episoden:", "Episodes:"), &sh.episodes.to_string(), width));
     }
     text.push_line(Line::default());
     let desc = match app.show_desc.get(&sh.slug) {
@@ -372,11 +371,27 @@ fn draw_show(f: &mut Frame, app: &App, area: Rect) {
         text.push_line(Line::from(Span::styled(l.to_string(), Style::new().fg(FG))));
     }
     text.push_line(Line::default());
-    text.push_line(Line::from(Span::styled(tr("Enter: Kanal in „Alle“ öffnen und abspielen", "Enter: open channel in “All” and play"), Style::new().fg(MUTED))));
+    let hint = match (sh.live, crate::i18n::en()) {
+        (true, false) => "Enter: Kanal anhören",
+        (false, false) => "Enter: Kanal anhören (die Show startet später)",
+        (true, true) => "Enter: listen to the channel",
+        (false, true) => "Enter: listen to the channel (the show starts later)",
+    };
+    text.push_line(Line::from(Span::styled(hint, Style::new().fg(MUTED))));
     f.render_widget(
         Paragraph::new(text).wrap(Wrap { trim: true }).block(block(&sh.name).padding(Padding::horizontal(1))),
         area,
     );
+}
+
+/// Pad or cut (with an ellipsis) to exactly `w` columns.
+fn fit(s: &str, w: usize) -> String {
+    if s.chars().count() > w {
+        let cut: String = s.chars().take(w.saturating_sub(1)).collect();
+        format!("{cut}…")
+    } else {
+        format!("{s:<w$}")
+    }
 }
 
 const LABEL_W: usize = 18;
@@ -492,7 +507,7 @@ fn draw_hints(f: &mut Frame, app: &App, area: Rect) {
     let keys: Vec<(&str, &str)> = if app.searching {
         vec![("Enter", tr("Spielen", "Play")), ("Esc", tr("Suche beenden", "End search"))]
     } else if app.tab >= 2 {
-        vec![("Enter", tr("Kanal anhören", "Listen")), ("␣", tr("Start/Stop", "Start/Stop")), ("/", tr("Suche", "Search")), ("?", tr("Hilfe", "Help"))]
+        vec![("Enter", tr("Kanal anhören", "Listen")), ("t", tr("Jetzt", "Now")), ("[ ]", tr("Tag", "Day")), ("/", tr("Suche", "Search")), ("?", tr("Hilfe", "Help"))]
     } else {
         vec![("Enter", tr("Spielen", "Play")), ("␣", tr("Start/Stop", "Start/Stop")), ("f", tr("Favorit", "Favorite")), ("/", tr("Suche", "Search")), ("?", tr("Hilfe", "Help"))]
     };
@@ -506,7 +521,7 @@ fn draw_hints(f: &mut Frame, app: &App, area: Rect) {
 fn draw_help(f: &mut Frame) {
     let area = f.area();
     let w = 62.min(area.width);
-    let h = 27.min(area.height);
+    let h = 28.min(area.height);
     let popup = Rect::new((area.width - w) / 2, (area.height - h) / 2, w, h);
     let keys = [
         ("↑/↓  j/k", tr("Kanal wählen", "Select channel")),
@@ -521,7 +536,8 @@ fn draw_help(f: &mut Frame) {
         ("f", tr("Favorit an/aus", "Toggle favorite")),
         ("/", tr("Suche (Name, Beschreibung, Artists, Genre)", "Search names, artists, genres")),
         ("Esc", tr("Suche beenden", "End search")),
-        ("Tab / 1–4", tr("Liste: Alle, Favoriten, Live Shows, Show Plan", "List: all, favorites, live shows, show plan")),
+        ("Tab / 1–3", tr("Liste: Alle, Favoriten, Shows", "List: all, favorites, shows")),
+        ("t  [  ]", tr("Shows: jetzt / voriger / nächster Tag", "Shows: now / previous / next day")),
         ("m", tr("Mini-Player (eine Zeile) an/aus", "Toggle one-line player")),
         ("S", tr("Hörstatistik (Tab Seite, ←/→ Zeitraum)", "Listening stats (Tab page, ←/→ period)")),
         (tr("Maus", "Mouse"), tr("Klick wählt, Doppelklick spielt, Rad", "click selects, double-click plays, wheel")),

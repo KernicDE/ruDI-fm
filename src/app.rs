@@ -76,8 +76,8 @@ fn local(ts: i64) -> chrono::DateTime<chrono::Local> {
 fn day_label(ts: i64) -> String {
     let days = (local(ts).date_naive() - chrono::Local::now().date_naive()).num_days();
     match days {
-        0 => tr("Heute", "Today").to_string(),
-        1 => tr("Morgen", "Tomorrow").to_string(),
+        0 => format!("{} · {} {}", tr("Heute", "Today"), weekday(ts), date(ts)),
+        1 => format!("{} · {} {}", tr("Morgen", "Tomorrow"), weekday(ts), date(ts)),
         _ => format!("{} {}", weekday(ts), date(ts)),
     }
 }
@@ -152,6 +152,8 @@ pub struct App {
     pub search: String,
     pub searching: bool,
     pub rows: Vec<Row>,
+    /// Shows tab: first row after the "live now" section.
+    pub plan_start: usize,
     pub list: ListState,
     pub hits: Hits,
     last_click: Option<(Instant, usize)>,
@@ -200,7 +202,7 @@ impl App {
         let catalog = Catalog::load();
         let player = Player::spawn(state.volume, tx.clone())?;
         let publisher = Publisher::start(cfg.discord_app_id.clone(), cfg.overlay_port, tx.clone());
-        let tabs = [tr("Alle", "All"), tr("★ Favoriten", "★ Favorites"), tr("Live Shows", "Live Shows"), tr("Show Plan", "Show Plan")].map(String::from).to_vec();
+        let tabs = [tr("Alle", "All"), tr("★ Favoriten", "★ Favorites"), tr("Shows", "Shows")].map(String::from).to_vec();
 
         let (listen, today_secs) = stats::totals(&stats::load(), unix_now());
         let app = App {
@@ -220,6 +222,7 @@ impl App {
             search: String::new(),
             searching: false,
             rows: Vec::new(),
+            plan_start: 0,
             list: ListState::default(),
             hits: Hits::default(),
             last_click: None,
@@ -290,14 +293,7 @@ impl App {
         }
     }
 
-    /// Play a channel; from a show row, jump to it in the full list first.
     fn activate(&mut self, c: usize) {
-        if self.selected_show().is_some() {
-            self.set_tab(0);
-            if let Some(i) = self.rows.iter().position(|r| *r == Row::Channel(c)) {
-                self.list.select(Some(i));
-            }
-        }
         self.play_channel(c);
     }
 
@@ -323,9 +319,10 @@ impl App {
         });
         let keep = self.selected_channel().or(self.playing.as_ref().map(|p| p.channel));
         let mut rows = Vec::new();
+        let mut plan_start = 0;
         let q = self.search.to_lowercase();
 
-        if !q.is_empty() {
+        if !q.is_empty() && self.tab != 2 {
             for (i, ch) in self.channels.iter().enumerate() {
                 let info = self.info(ch);
                 let hay = format!(
@@ -357,12 +354,24 @@ impl App {
             // most listened first (stable: ties keep the list order)
             favs.sort_by_key(|&i| std::cmp::Reverse(self.listen.get(&self.channels[i].key).copied().unwrap_or(0)));
             rows.extend(favs.into_iter().map(Row::Channel));
-        } else if self.tab == 2 {
-            let mut live: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].live && self.show_channel(i).is_some()).collect();
-            live.sort_by(|&a, &b| self.shows[a].name.to_lowercase().cmp(&self.shows[b].name.to_lowercase()));
-            rows.extend(live.into_iter().map(Row::Show));
         } else {
-            let mut plan: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].next_start > 0 && self.shows[i].next_start < unix_now() + 7 * 86400 && self.show_channel(i).is_some()).collect();
+            let now = unix_now();
+            let hit = |i: usize| {
+                let sh = &self.shows[i];
+                let chan = self.show_channel(i).map_or("", |c| self.channels[c].name.as_str());
+                let hay = format!("{} {} {chan}", sh.name, sh.tagline).to_lowercase();
+                q.split_whitespace().all(|w| hay.contains(w))
+            };
+            let mut live: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].live && self.show_channel(i).is_some() && hit(i)).collect();
+            live.sort_by_key(|&i| self.shows[i].name.to_lowercase());
+            if !live.is_empty() {
+                rows.push(Row::Header(tr("Jetzt live", "Live now").to_string()));
+                rows.extend(live.into_iter().map(Row::Show));
+            }
+            plan_start = rows.len();
+            let mut plan: Vec<usize> = (0..self.shows.len())
+                .filter(|&i| self.shows[i].next_start > now && self.shows[i].next_start < now + 7 * 86400 && self.show_channel(i).is_some() && hit(i))
+                .collect();
             plan.sort_by_key(|&i| self.shows[i].next_start);
             let mut last_day = String::new();
             for i in plan {
@@ -376,6 +385,7 @@ impl App {
         }
 
         self.rows = rows;
+        self.plan_start = plan_start;
         let idx = keep_show
             .and_then(|(n, c)| self.rows.iter().position(|r| matches!(r, Row::Show(i) if self.shows[*i].name == n && self.shows[*i].channel_id == c)))
             .or_else(|| keep.and_then(|c| self.rows.iter().position(|r| *r == Row::Channel(c))))
@@ -408,6 +418,22 @@ impl App {
         }
         self.list.select(Some(i.clamp(0, len - 1) as usize));
         self.selected_at = Instant::now();
+    }
+
+    /// Shows tab: 0 = first upcoming show, ±1 = first show of the next/previous day.
+    fn jump_day(&mut self, dir: isize) {
+        let cur = self.list.selected().unwrap_or(0);
+        let heads = || self.rows.iter().enumerate().skip(self.plan_start).filter(|(_, r)| matches!(r, Row::Header(_))).map(|(i, _)| i);
+        let target = match dir {
+            1 => heads().find(|&h| h > cur).map(|h| h + 1),
+            -1 => heads().filter(|&h| h + 1 < cur).last().map(|h| h + 1),
+            _ => None,
+        };
+        let first = || self.rows.iter().enumerate().skip(self.plan_start).find(|(_, r)| r.is_item()).map(|(i, _)| i);
+        if let Some(i) = target.or_else(first) {
+            self.list.select(Some(i));
+            self.selected_at = Instant::now();
+        }
     }
 
     fn select_edge(&mut self, last: bool) {
@@ -788,6 +814,7 @@ impl App {
 
         // selection-dependent data (debounced)
         if self.selected_at.elapsed() > SELECT_DEBOUNCE
+            && self.tab != 2
             && let Some(c) = self.selected_channel()
         {
             let id = self.channels[c].id;
@@ -941,6 +968,9 @@ impl App {
                     self.selected_at = Instant::now();
                 }
             }
+            KeyCode::Char('t') if self.tab == 2 => self.jump_day(0),
+            KeyCode::Char(']') if self.tab == 2 => self.jump_day(1),
+            KeyCode::Char('[') if self.tab == 2 => self.jump_day(-1),
             KeyCode::Tab => self.set_tab((self.tab + 1) % self.tabs.len()),
             KeyCode::BackTab => self.set_tab((self.tab + self.tabs.len() - 1) % self.tabs.len()),
             KeyCode::Char(c @ '1'..='9') => {
