@@ -13,7 +13,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind};
 use ratatui_image::picker::Picker;
 
 use api::{Channel, Track};
@@ -69,7 +69,9 @@ fn main() -> Result<()> {
         let _ = event::read();
     }
 
+    let _ = crossterm::execute!(std::io::stdout(), EnableMouseCapture);
     let result = run(&mut terminal, cfg, state, picker);
+    let _ = crossterm::execute!(std::io::stdout(), DisableMouseCapture);
     ratatui::restore();
     result
 }
@@ -112,11 +114,12 @@ fn run(terminal: &mut ratatui::DefaultTerminal, cfg: Config, state: State, picke
         app.tick();
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
-        if event::poll(Duration::from_millis(200))?
-            && let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-        {
-            app.on_key(key);
+        if event::poll(Duration::from_millis(200))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => app.on_key(key),
+                Event::Mouse(m) => app.on_mouse(m),
+                _ => {}
+            }
         }
     }
     app.stop();

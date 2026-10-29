@@ -3,8 +3,9 @@ use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use image::DynamicImage;
+use ratatui::layout::{Position, Rect};
 use ratatui::widgets::ListState;
 use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
@@ -23,6 +24,17 @@ const HISTORY_MAX_AGE: Duration = Duration::from_secs(60);
 const SELECT_DEBOUNCE: Duration = Duration::from_millis(350);
 const STATUS_TTL: Duration = Duration::from_secs(6);
 const MATCH_RETRY: Duration = Duration::from_millis(1500);
+
+/// Clickable areas of the last drawn frame, filled by `ui::draw`.
+#[derive(Default)]
+pub struct Hits {
+    pub tabs: Vec<Rect>,
+    pub list: Rect,
+    /// Previous, start/stop, next.
+    pub ctl: [Rect; 3],
+    pub vol: Rect,
+    pub now: Rect,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Row {
@@ -98,6 +110,7 @@ pub struct App {
     pub searching: bool,
     pub rows: Vec<Row>,
     pub list: ListState,
+    pub hits: Hits,
     selected_at: Instant,
     pub show_help: bool,
     pub stats: Option<StatsView>,
@@ -161,6 +174,7 @@ impl App {
             searching: false,
             rows: Vec::new(),
             list: ListState::default(),
+            hits: Hits::default(),
             selected_at: Instant::now(),
             show_help: false,
             stats: None,
@@ -811,6 +825,62 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    pub fn on_mouse(&mut self, m: MouseEvent) {
+        if self.show_help {
+            if matches!(m.kind, MouseEventKind::Down(_)) {
+                self.show_help = false;
+            }
+            return;
+        }
+        if self.stats.is_some() {
+            return;
+        }
+        let pos = Position::new(m.column, m.row);
+        let h = &self.hits;
+        let (list, vol, now) = (h.list, h.vol, h.now);
+        match m.kind {
+            MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+                let dir = if m.kind == MouseEventKind::ScrollUp { -1 } else { 1 };
+                if list.contains(pos) {
+                    self.move_selection(dir * 3);
+                } else if now.contains(pos) {
+                    self.change_volume(-dir as i64 * 5);
+                }
+            }
+            MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Drag(MouseButton::Left) => {
+                if vol.contains(pos) {
+                    let v = (pos.x - vol.x) as i64 * 100 / (vol.width as i64 - 1).max(1);
+                    self.change_volume(v - self.state.volume);
+                } else if m.kind == MouseEventKind::Down(MouseButton::Left) {
+                    self.on_click(pos);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn on_click(&mut self, pos: Position) {
+        let h = &self.hits;
+        if let Some(i) = h.tabs.iter().position(|r| r.contains(pos)) {
+            self.searching = false;
+            self.set_tab(i);
+        } else if let Some(i) = h.ctl.iter().position(|r| r.contains(pos)) {
+            match i {
+                0 => self.skip(false),
+                1 => self.toggle(),
+                _ => self.skip(true),
+            }
+        } else if h.list.contains(pos) {
+            let idx = self.list.offset() + (pos.y - h.list.y) as usize;
+            if let Some(Row::Channel(c)) = self.rows.get(idx).cloned() {
+                self.searching = false;
+                self.list.select(Some(idx));
+                self.selected_at = Instant::now();
+                self.play_channel(c);
+            }
         }
     }
 

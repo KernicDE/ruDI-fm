@@ -63,13 +63,24 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
 }
 
-fn draw_header(f: &mut Frame, app: &App, area: Rect) {
+fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
     let [logo, tabs] = Layout::horizontal([Constraint::Length(11), Constraint::Min(10)]).areas(area);
     f.render_widget(
         Line::from(vec![Span::styled(" ru", Style::new().fg(MUTED)), Span::styled("DI.FM ", Style::new().fg(ACCENT).bold())]),
         logo,
     );
     let titles: Vec<Line> = app.tabs.iter().enumerate().map(|(i, t)| Line::from(format!("{} {t}", i + 1))).collect();
+    // Tabs pads each title with one space per side and puts a 1-cell divider between them.
+    let mut x = tabs.x;
+    app.hits.tabs = titles
+        .iter()
+        .map(|t| {
+            let w = t.width() as u16 + 2;
+            let r = Rect::new(x, tabs.y, w, 1).intersection(tabs);
+            x += w + 1;
+            r
+        })
+        .collect();
     let selected = if app.search.is_empty() && !app.searching { Some(app.tab) } else { None };
     f.render_widget(
         Tabs::new(titles)
@@ -89,6 +100,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         format!("{} · {n} Kanäle", app.tabs[app.tab])
     };
     let blk = block(&title);
+    app.hits.list = blk.inner(area);
 
     if app.loading {
         f.render_widget(Paragraph::new("Lade Kanäle …").fg(MUTED).block(blk), area);
@@ -146,6 +158,7 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
     let blk = block(if playing { "Läuft gerade" } else { "Gestoppt" });
     let inner = blk.inner(area);
     f.render_widget(blk, area);
+    app.hits.now = area;
 
     // cover: roughly square (terminal cells are ~2:1)
     let cover_w = (inner.height * 2 + 1).min(inner.width / 2);
@@ -197,7 +210,7 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
         ]));
     }
 
-    let [text, _, gauge, _, vol] = Layout::vertical([
+    let [text, _, gauge, ctl, vol] = Layout::vertical([
         Constraint::Length(lines.len() as u16),
         Constraint::Min(0),
         Constraint::Length(1),
@@ -221,8 +234,21 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
         f.render_widget(Span::styled(format!("seit {}", mmss(unix_now() - np.started)), Style::new().fg(MUTED)), gauge);
     }
 
+    let labels = ["◀◀ Zurück", if playing { "■ Stop" } else { "▶ Start" }, "Weiter ▶▶"];
+    let mut x = ctl.x;
+    let mut spans = Vec::new();
+    for (i, l) in labels.iter().enumerate() {
+        let w = l.chars().count() as u16;
+        app.hits.ctl[i] = Rect::new(x, ctl.y, w, 1).intersection(ctl);
+        x += w + 3;
+        spans.push(Span::styled(*l, Style::new().fg(ACCENT).bold()));
+        spans.push(Span::raw("   "));
+    }
+    f.render_widget(Line::from(spans), ctl);
+
     let v = app.state.volume;
     let bar_w = 20usize;
+    app.hits.vol = Rect::new(vol.x + 4, vol.y, bar_w as u16, 1).intersection(vol);
     let filled = (v.min(100) as usize * bar_w) / 100;
     f.render_widget(
         Line::from(vec![
@@ -344,7 +370,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
 fn draw_help(f: &mut Frame) {
     let area = f.area();
     let w = 62.min(area.width);
-    let h = 25.min(area.height);
+    let h = 26.min(area.height);
     let popup = Rect::new((area.width - w) / 2, (area.height - h) / 2, w, h);
     let keys = [
         ("↑/↓  j/k", "Kanal wählen"),
@@ -361,6 +387,7 @@ fn draw_help(f: &mut Frame) {
         ("Esc", "Suche beenden"),
         ("Tab / 1–6", "Liste: Alle, Favoriten, Stimmungen"),
         ("S", "Hörstatistik (Tab Seite, ←/→ Zeitraum)"),
+        ("Maus", "Klick, Rad: Liste, Tabs, Knöpfe, Vol"),
         ("q", "Beenden"),
     ];
     let mut lines: Vec<Line> = keys
