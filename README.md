@@ -122,4 +122,4 @@ Titelabgleich: Maßgeblich ist der ICY-Titel aus dem Stream, also das, was gerad
 
 ## Downloads und Updates
 
-Jeder Push auf `master` baut Linux (x86_64), Windows (x86_64) und macOS (universal) und aktualisiert das Release [`latest`](https://github.com/KernicDE/ruDI-fm/releases/tag/latest). `rudi-fm update` ersetzt das laufende Programm durch den neuesten Build. Voraussetzung ist ein Download aus diesem Release, lokal gebaute Versionen kennen ihren Commit nicht. Der Windows-Build ist ungetestet (mpv-IPC über Named Pipe).
+Jeder Push auf `master` baut Linux, Windows (je x86_64 und ARM64) und macOS (Intel und Apple Silicon, je als DMG) und aktualisiert das Release [`latest`](https://github.com/KernicDE/ruDI-fm/releases/tag/latest). `rudi-fm update` ersetzt das laufende Programm durch den neuesten Build. Voraussetzung ist ein Download aus diesem Release, lokal gebaute Versionen kennen ihren Commit nicht. Der Windows-Build ist ungetestet (mpv-IPC über Named Pipe).

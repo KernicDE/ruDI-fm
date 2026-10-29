@@ -12,14 +12,14 @@ const RELEASE_URL: &str = "https://api.github.com/repos/KernicDE/ruDI-fm/release
 /// Commit of this build; set by CI, absent in local builds (no updates for those).
 const BUILD: Option<&str> = option_env!("RUDI_BUILD");
 
-const ASSET: Option<&str> = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-    Some("rudi-fm-linux-x86_64")
-} else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-    Some("rudi-fm-windows-x86_64.exe")
-} else if cfg!(target_os = "macos") {
-    Some("rudi-fm-macos-universal")
-} else {
-    None
+const ASSET: Option<&str> = match (cfg!(target_os = "linux"), cfg!(target_os = "windows"), cfg!(target_os = "macos")) {
+    (true, _, _) if cfg!(target_arch = "x86_64") => Some("rudi-fm-linux-x86_64"),
+    (true, _, _) if cfg!(target_arch = "aarch64") => Some("rudi-fm-linux-aarch64"),
+    (_, true, _) if cfg!(target_arch = "x86_64") => Some("rudi-fm-windows-x86_64.exe"),
+    (_, true, _) if cfg!(target_arch = "aarch64") => Some("rudi-fm-windows-aarch64.exe"),
+    (_, _, true) if cfg!(target_arch = "x86_64") => Some("rudi-fm-macos-x86_64"),
+    (_, _, true) if cfg!(target_arch = "aarch64") => Some("rudi-fm-macos-aarch64"),
+    _ => None,
 };
 
 struct Release {

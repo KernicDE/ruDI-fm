@@ -17,31 +17,27 @@ env:
   RUDI_BUILD: ${{ github.sha }}
 
 jobs:
-  linux:
-    runs-on: ubuntu-22.04
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-22.04, src: target/release/rudi-fm, asset: rudi-fm-linux-x86_64 }
+          - { runner: ubuntu-24.04-arm, src: target/release/rudi-fm, asset: rudi-fm-linux-aarch64 }
+          - { runner: windows-latest, src: target/release/rudi-fm.exe, asset: rudi-fm-windows-x86_64.exe }
+          - { runner: windows-11-arm, src: target/release/rudi-fm.exe, asset: rudi-fm-windows-aarch64.exe }
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
-      - run: cp target/release/rudi-fm rudi-fm-linux-x86_64
+      - run: cp ${{ matrix.src }} ${{ matrix.asset }}
+        shell: bash
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
-          path: rudi-fm-linux-x86_64
-
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release
-      - run: cp target/release/rudi-fm.exe rudi-fm-windows-x86_64.exe
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: rudi-fm-windows-x86_64.exe
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
 
   macos:
     runs-on: macos-14
@@ -53,37 +49,37 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --target aarch64-apple-darwin
       - run: cargo build --release --target x86_64-apple-darwin
-      - name: Universal binary, app bundle, DMG
+      - name: App bundle und DMG je Architektur
         run: |
           set -euo pipefail
           VERSION="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
-          lipo -create \
-            target/aarch64-apple-darwin/release/rudi-fm \
-            target/x86_64-apple-darwin/release/rudi-fm \
-            -output rudi-fm-macos-universal
-          chmod +x rudi-fm-macos-universal
+          for pair in aarch64:aarch64-apple-darwin x86_64:x86_64-apple-darwin; do
+            ARCH="${pair%%:*}"; TARGET="${pair#*:}"
+            cp "target/$TARGET/release/rudi-fm" "rudi-fm-macos-$ARCH"
+            chmod +x "rudi-fm-macos-$ARCH"
 
-          APP="ruDI.FM.app"
-          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-          cp rudi-fm-macos-universal "$APP/Contents/MacOS/rudi-fm"
-          cp packaging/macos/launcher.sh "$APP/Contents/MacOS/rudi-fm-launcher"
-          chmod +x "$APP/Contents/MacOS/rudi-fm-launcher"
-          sed "s/__VERSION__/$VERSION/" packaging/macos/Info.plist.in > "$APP/Contents/Info.plist"
-          echo "APPL????" > "$APP/Contents/PkgInfo"
-
-          mkdir dmg-root
-          cp -R "$APP" dmg-root/
-          ln -s /Applications dmg-root/Applications
-          hdiutil create -volname "ruDI.FM" -srcfolder dmg-root -ov -format UDZO ruDI.FM-macOS.dmg
+            APP="ruDI.FM.app"; rm -rf "$APP" dmg-root
+            mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" dmg-root
+            cp "rudi-fm-macos-$ARCH" "$APP/Contents/MacOS/rudi-fm"
+            cp packaging/macos/launcher.sh "$APP/Contents/MacOS/rudi-fm-launcher"
+            chmod +x "$APP/Contents/MacOS/rudi-fm-launcher"
+            sed "s/__VERSION__/$VERSION/" packaging/macos/Info.plist.in > "$APP/Contents/Info.plist"
+            echo "APPL????" > "$APP/Contents/PkgInfo"
+            cp -R "$APP" dmg-root/
+            ln -s /Applications dmg-root/Applications
+            hdiutil create -volname "ruDI.FM" -srcfolder dmg-root -ov -format UDZO "ruDI.FM-macOS-$ARCH.dmg"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: |
-            rudi-fm-macos-universal
-            ruDI.FM-macOS.dmg
+            rudi-fm-macos-aarch64
+            rudi-fm-macos-x86_64
+            ruDI.FM-macOS-aarch64.dmg
+            ruDI.FM-macOS-x86_64.dmg
 
   release:
-    needs: [linux, windows, macos]
+    needs: [native, macos]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
