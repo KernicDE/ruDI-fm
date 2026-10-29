@@ -1,5 +1,6 @@
 //! Self-update from the rolling GitHub release `latest` (one build per push to master).
 
+use crate::i18n::tr;
 use std::fs;
 use std::io::Write;
 use std::time::Duration;
@@ -60,13 +61,13 @@ pub fn available() -> bool {
 /// `rudi-fm update`
 pub fn run() -> Result<()> {
     if BUILD.is_none() || ASSET.is_none() {
-        bail!("Dieser Build unterstützt kein Self-Update (lokaler Build oder nicht unterstützte Plattform)");
+        bail!("{}", tr("Dieser Build unterstützt kein Self-Update (lokaler Build oder nicht unterstützte Plattform)", "This build does not support self-update (local build or unsupported platform)"));
     }
     let Some(rel) = newer()? else {
-        println!("ruDI.FM ist aktuell.");
+        println!("{}", tr("ruDI.FM ist aktuell.", "ruDI.FM is up to date."));
         return Ok(());
     };
-    println!("Lade Update {} …", &rel.commit[..rel.commit.len().min(7)]);
+    println!("{} {} …", tr("Lade Update", "Downloading update"), &rel.commit[..rel.commit.len().min(7)]);
     let bytes = agent(300).get(&rel.url).call()?.body_mut().with_config().limit(200 * 1024 * 1024).read_to_vec()?;
 
     let exe = std::env::current_exe()?;
@@ -92,6 +93,6 @@ pub fn run() -> Result<()> {
         let _ = fs::rename(&old, &exe);
         return Err(e).context("Binary ersetzen");
     }
-    println!("Aktualisiert. Bitte ruDI.FM neu starten.");
+    println!("{}", tr("Aktualisiert. Bitte ruDI.FM neu starten.", "Updated. Please restart ruDI.FM."));
     Ok(())
 }

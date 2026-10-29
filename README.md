@@ -39,6 +39,7 @@ Weitere Einstellungen in `~/.config/rudi-fm/config.toml` (wird beim ersten Start
 | `discord_app_id` | leer | Application-ID für Discord Rich Presence, leer = aus |
 | `overlay_port` | `8765` | Port des OBS-Overlays, `0` = aus |
 | `autoplay` | `false` | Zuletzt gehörten Kanal beim Start abspielen |
+| `language` | `"auto"` | Oberfläche: `"auto"` (Systemsprache), `"de"` oder `"en"` |
 
 Favoriten, letzter Kanal und Lautstärke liegen in `~/.local/state/rudi-fm/state.json`.
 
@@ -108,7 +109,8 @@ src/
   main.rs         Terminal-Setup, Event-Loop
   app.rs          Zustand, Tasten, Wiedergabe, Titelabgleich ICY ↔ API
   ui.rs           ratatui-Oberfläche
-  api.rs          AudioAddict-API (Kanäle, Now-Playing, Verlauf, Stream-URLs)
+  i18n.rs         Sprache (DE/EN), tr(de, en)
+  api.rs          AudioAddict-API (Kanäle, Verlauf, Stream-URLs)
   config.rs       Pfade, config.toml, Listen-Key, Favoriten/Zustand
   player.rs       mpv über JSON-IPC
   stats.rs        Hörstatistik (history.jsonl, Auswertung, Export)

@@ -2,13 +2,13 @@ mod api;
 mod app;
 mod config;
 mod data;
+mod i18n;
 mod nowplaying;
 mod player;
 mod stats;
 mod ui;
 mod updater;
 
-use std::collections::HashMap;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -23,7 +23,6 @@ use player::PlayerEvent;
 
 pub enum AppEvent {
     Channels(Result<Vec<Channel>, String>),
-    NowAll(HashMap<u64, Track>),
     History(u64, Vec<Track>),
     Streams(String, Result<Vec<String>, String>),
     Cover(String, Option<image::DynamicImage>),
@@ -39,6 +38,7 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let args: Vec<String> = std::env::args().collect();
+    i18n::init("auto");
     if args.get(1).is_some_and(|a| a == "update") {
         return updater::run();
     }
@@ -92,9 +92,9 @@ fn check_mpv() {
     } else if cfg!(target_os = "windows") {
         "winget install mpv"
     } else {
-        "Paketmanager der Distribution, z. B. `sudo pacman -S mpv` oder `sudo apt install mpv`"
+        i18n::tr("Paketmanager der Distribution, z. B. `sudo pacman -S mpv` oder `sudo apt install mpv`", "your distribution's package manager, e.g. `sudo pacman -S mpv` or `sudo apt install mpv`")
     };
-    eprintln!("ruDI.FM braucht mpv für die Wiedergabe, es wurde aber nicht gefunden (PATH).\nInstallieren: {hint}");
+    eprintln!("{}\n{} {hint}", i18n::tr("ruDI.FM braucht mpv für die Wiedergabe, es wurde aber nicht gefunden (PATH).", "ruDI.FM needs mpv for playback, but it was not found (PATH)."), i18n::tr("Installieren:", "Install:"));
     std::process::exit(1);
 }
 
@@ -103,7 +103,7 @@ fn run(terminal: &mut ratatui::DefaultTerminal, cfg: Config, state: State, picke
     let mut app = App::new(cfg, state, picker, tx.clone())?;
     std::thread::spawn(move || {
         if updater::available() {
-            let _ = tx.send(AppEvent::Status("Update verfügbar: im Terminal `rudi-fm update` ausführen".into()));
+            let _ = tx.send(AppEvent::Status(i18n::tr("Update verfügbar: im Terminal `rudi-fm update` ausführen", "Update available: run `rudi-fm update` in a terminal").into()));
         }
     });
 

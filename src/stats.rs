@@ -1,5 +1,6 @@
 //! Local listening log (`history.jsonl`, one line per heard track) and its aggregation.
 
+use crate::i18n::tr;
 use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -93,11 +94,11 @@ impl Period {
 
     pub fn label(self, now: i64) -> String {
         match self {
-            Period::Today => "Heute".into(),
-            Period::Week => "7 Tage".into(),
-            Period::Month => "30 Tage".into(),
-            Period::Year => format!("Jahr {}", Local.timestamp_opt(now, 0).single().map(|d| d.year()).unwrap_or(0)),
-            Period::All => "Gesamt".into(),
+            Period::Today => tr("Heute", "Today").into(),
+            Period::Week => tr("7 Tage", "7 days").into(),
+            Period::Month => tr("30 Tage", "30 days").into(),
+            Period::Year => format!("{} {}", tr("Jahr", "Year"), Local.timestamp_opt(now, 0).single().map(|d| d.year()).unwrap_or(0)),
+            Period::All => tr("Gesamt", "All time").into(),
         }
     }
 
@@ -195,20 +196,20 @@ pub fn aggregate(entries: &[Entry], period: Period, now: i64) -> Stats {
 pub fn print_summary(entries: &[Entry]) {
     let now = crate::nowplaying::unix_now();
     if entries.is_empty() {
-        println!("Noch keine Hörstatistik (wird beim Hören in {} aufgebaut).", path().display());
+        println!("{} {}", tr("Noch keine Hörstatistik, wird beim Hören aufgebaut in:", "No listening stats yet, built up while listening in:"), path().display());
         return;
     }
     for p in Period::ALL {
         let s = aggregate(entries, p, now);
-        println!("== {} · {} · {} Tracks · längste Session {}", p.label(now), fmt_dur(s.secs), s.tracks, fmt_dur(s.longest_session));
+        println!("== {} · {} · {} Tracks · {} {}", p.label(now), fmt_dur(s.secs), s.tracks, tr("längste Session", "longest session"), fmt_dur(s.longest_session));
         if p == Period::All {
-            for (title, list) in [("Kanäle", &s.channels), ("Künstler", &s.artists), ("Tracks", &s.top_tracks)] {
+            for (title, list) in [(tr("Kanäle", "Channels"), &s.channels), (tr("Künstler", "Artists"), &s.artists), ("Tracks", &s.top_tracks)] {
                 println!("\n{title}");
                 for (n, secs, cnt, chans) in list.iter().take(10) {
                     println!("  {n:<40} {:>8}  {cnt}x  {chans}", fmt_dur(*secs));
                 }
             }
-            println!("\nSerie: {} Tage", s.streak);
+            println!("\n{}: {} {}", tr("Serie", "Streak"), s.streak, tr("Tage", "days"));
         }
     }
 }

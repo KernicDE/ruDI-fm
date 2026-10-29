@@ -6,6 +6,7 @@ use ratatui::widgets::{Bar, BarChart, BarGroup, Block, BorderType, Borders, Clea
 use ratatui_image::{Resize, StatefulImage};
 
 use crate::app::{App, Row};
+use crate::i18n::tr;
 use crate::nowplaying::unix_now;
 use crate::stats::fmt_dur;
 
@@ -25,6 +26,24 @@ fn block(title: &str) -> Block<'_> {
         .title(Span::styled(format!(" {title} "), Style::new().fg(ACCENT).bold()))
 }
 
+/// Winamp-style ticker: text wider than `w` scrolls to its end and back, pausing at both ends.
+fn marquee(s: &str, w: usize) -> String {
+    let step = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() / 200) as usize;
+    marquee_at(s, w, step)
+}
+
+fn marquee_at(s: &str, w: usize, step: usize) -> String {
+    const PAUSE: usize = 5;
+    let n = s.chars().count();
+    if w == 0 || n <= w {
+        return s.to_string();
+    }
+    let over = n - w;
+    let p = step % (2 * (over + PAUSE));
+    let off = if p < over + PAUSE { p.saturating_sub(PAUSE) } else { over - (p - over - PAUSE).saturating_sub(PAUSE) };
+    s.chars().skip(off).take(w).collect()
+}
+
 fn mmss(secs: i64) -> String {
     let s = secs.max(0);
     if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
@@ -33,8 +52,10 @@ fn mmss(secs: i64) -> String {
 fn ago(started: i64) -> String {
     let d = (unix_now() - started).max(0);
     match d {
-        0..=59 => "gerade".into(),
+        0..=59 => tr("gerade", "just now").into(),
+        60..=3599 if crate::i18n::en() => format!("{} min ago", d / 60),
         60..=3599 => format!("vor {} min", d / 60),
+        _ if crate::i18n::en() => format!("{} h ago", d / 3600),
         _ => format!("vor {} h", d / 3600),
     }
 }
@@ -45,7 +66,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     draw_header(f, app, header);
 
-    let [left, right] = Layout::horizontal([Constraint::Percentage(42), Constraint::Percentage(58)]).areas(body);
+    let [left, right] = Layout::horizontal([Constraint::Length(34), Constraint::Min(30)]).areas(body);
     draw_list(f, app, left);
 
     let [now, info, hist] =
@@ -94,26 +115,26 @@ fn draw_header(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let title = if app.searching || !app.search.is_empty() {
-        format!("Suche: {}{}", app.search, if app.searching { "▏" } else { "" })
+        format!("{} {}{}", tr("Suche:", "Search:"), app.search, if app.searching { "▏" } else { "" })
     } else {
         let n = app.rows.iter().filter(|r| matches!(r, Row::Channel(_))).count();
-        format!("{} · {n} Kanäle", app.tabs[app.tab])
+        format!("{} · {n} {}", app.tabs[app.tab], tr("Kanäle", "channels"))
     };
     let blk = block(&title);
     app.hits.list = blk.inner(area);
 
     if app.loading {
-        f.render_widget(Paragraph::new("Lade Kanäle …").fg(MUTED).block(blk), area);
+        f.render_widget(Paragraph::new(tr("Lade Kanäle …", "Loading channels …")).fg(MUTED).block(blk), area);
         return;
     }
     if app.rows.is_empty() {
-        let msg = if app.tab == 1 && app.search.is_empty() { "Noch keine Favoriten – mit f markieren." } else { "Keine Treffer." };
+        let msg = if app.tab == 1 && app.search.is_empty() { tr("Noch keine Favoriten – mit f markieren.", "No favorites yet – press f to add.") } else { tr("Keine Treffer.", "No matches.") };
         f.render_widget(Paragraph::new(msg).fg(MUTED).block(blk), area);
         return;
     }
 
     let inner_w = area.width.saturating_sub(4) as usize;
-    let name_w = 24.min(inner_w);
+    let name_w = inner_w;
     let playing = app.playing.as_ref().map(|p| p.channel);
     let items: Vec<ListItem> = app
         .rows
@@ -136,11 +157,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
                 };
                 let name: String = ch.name.chars().take(name_w).collect();
                 let name_style = if is_playing { Style::new().fg(OK).bold() } else { Style::new().fg(FG) };
-                let mut spans = vec![marker, Span::styled(format!("{name:<name_w$}"), name_style)];
-                if let Some(t) = app.now_all.get(&ch.id) {
-                    spans.push(Span::styled(format!(" {}", t.display()), Style::new().fg(MUTED)));
-                }
-                ListItem::new(Line::from(spans))
+                ListItem::new(Line::from(vec![marker, Span::styled(name, name_style)]))
             }
         })
         .collect();
@@ -155,7 +172,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
     let playing = app.playing.is_some();
-    let blk = block(if playing { "Läuft gerade" } else { "Gestoppt" });
+    let blk = block(if playing { tr("Läuft gerade", "Now playing") } else { tr("Gestoppt", "Stopped") });
     let inner = blk.inner(area);
     f.render_widget(blk, area);
     app.hits.now = area;
@@ -180,16 +197,16 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
         lines.push(Line::from(vec![
             Span::styled(ch.name.to_uppercase(), Style::new().fg(ACCENT).bold()),
             Span::styled(
-                if p.audio { "  ● live" } else { "  ○ verbinde …" },
+                if p.audio { "  ● live" } else { tr("  ○ verbinde …", "  ○ connecting …") },
                 Style::new().fg(if p.audio { OK } else { GOLD }),
             ),
         ]));
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(
-            if np.title.is_empty() { "…".to_string() } else { np.title.clone() },
+            if np.title.is_empty() { "…".to_string() } else { marquee(&np.title, text_area.width as usize) },
             Style::new().fg(FG).bold(),
         )));
-        lines.push(Line::from(Span::styled(np.artist.clone(), Style::new().fg(FG))));
+        lines.push(Line::from(Span::styled(marquee(&np.artist, text_area.width as usize), Style::new().fg(FG))));
         if let Some(t) = &p.track {
             let mut s = vec![];
             if t.votes_up + t.votes_down > 0 {
@@ -200,9 +217,9 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
             lines.push(Line::default());
         }
     } else {
-        lines.push(Line::from(Span::styled("Nichts läuft.", Style::new().fg(MUTED))));
+        lines.push(Line::from(Span::styled(tr("Nichts läuft.", "Nothing playing."), Style::new().fg(MUTED))));
         lines.push(Line::default());
-        for (k, d) in [("Enter / Doppelklick", " Kanal abspielen"), ("Leertaste", " letzten Kanal fortsetzen")] {
+        for (k, d) in [(tr("Enter / Doppelklick", "Enter / double-click"), tr(" abspielen", " play")), (tr("Leertaste", "Space"), tr(" fortsetzen", " resume last"))] {
             lines.push(Line::from(vec![Span::styled(k, Style::new().fg(ACCENT).bold()), Span::styled(d, Style::new().fg(MUTED))]));
         }
     }
@@ -228,10 +245,10 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
             gauge,
         );
     } else if playing && np.started > 0 {
-        f.render_widget(Span::styled(format!("seit {}", mmss(unix_now() - np.started)), Style::new().fg(MUTED)), gauge);
+        f.render_widget(Span::styled(format!("{} {}", tr("seit", "for"), mmss(unix_now() - np.started)), Style::new().fg(MUTED)), gauge);
     }
 
-    let labels = ["◀◀ Zurück", if playing { "■ Stop" } else { "▶ Start" }, "Weiter ▶▶"];
+    let labels = [tr("◀◀ Zurück", "◀◀ Prev"), if playing { "■ Stop" } else { tr("▶ Start", "▶ Play") }, tr("Weiter ▶▶", "Next ▶▶")];
     let mut x = ctl.x;
     let mut spans = Vec::new();
     for (i, l) in labels.iter().enumerate() {
@@ -261,7 +278,7 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_info(f: &mut Frame, app: &App, area: Rect) {
     let Some(c) = app.selected_channel() else {
-        f.render_widget(block("Kanal"), area);
+        f.render_widget(block(tr("Kanal", "Channel")), area);
         return;
     };
     let ch = &app.channels[c];
@@ -274,23 +291,23 @@ fn draw_info(f: &mut Frame, app: &App, area: Rect) {
         meta.push(Span::styled(format!(" · {t}"), Style::new().fg(MUTED)));
     }
     if app.state.favorites.contains(&ch.key) {
-        meta.push(Span::styled("  ★ Favorit", Style::new().fg(GOLD)));
+        meta.push(Span::styled(tr("  ★ Favorit", "  ★ Favorite"), Style::new().fg(GOLD)));
     }
     text.push_line(Line::from(meta));
     text.push_line(Line::default());
 
-    let desc = info.map(|i| i.desc.clone()).unwrap_or_else(|| ch.description.clone());
+    let desc = app.desc(ch).to_string();
     text.push_line(Line::from(Span::styled(desc, Style::new().fg(FG))));
     text.push_line(Line::default());
 
     let artists = info.map(|i| i.artists.clone()).unwrap_or_else(|| ch.artists.join(", "));
     text.push_line(Line::from(vec![
-        Span::styled("Typische Artists: ", Style::new().fg(MUTED)),
+        Span::styled(tr("Typische Artists: ", "Typical artists:  "), Style::new().fg(MUTED)),
         Span::styled(artists, Style::new().fg(FG)),
     ]));
     if !ch.filters.is_empty() {
         text.push_line(Line::from(vec![
-            Span::styled("DI.FM-Genres:     ", Style::new().fg(MUTED)),
+            Span::styled(tr("DI.FM-Genres:     ", "DI.FM genres:     "), Style::new().fg(MUTED)),
             Span::styled(ch.filters.join(", "), Style::new().fg(FG)),
         ]));
     }
@@ -302,7 +319,7 @@ fn draw_info(f: &mut Frame, app: &App, area: Rect) {
         .collect();
     if !similar.is_empty() {
         text.push_line(Line::from(vec![
-            Span::styled("Ähnlich:          ", Style::new().fg(MUTED)),
+            Span::styled(tr("Ähnlich:          ", "Similar:          "), Style::new().fg(MUTED)),
             Span::styled(similar.join(", "), Style::new().fg(FG)),
         ]));
     }
@@ -315,11 +332,11 @@ fn draw_info(f: &mut Frame, app: &App, area: Rect) {
 
 fn draw_history(f: &mut Frame, app: &App, area: Rect) {
     let Some(c) = app.selected_channel() else {
-        f.render_widget(block("Zuletzt gespielt"), area);
+        f.render_widget(block(tr("Zuletzt gespielt", "Recently played")), area);
         return;
     };
     let ch = &app.channels[c];
-    let blk = block("Zuletzt gespielt").padding(Padding::horizontal(1));
+    let blk = block(tr("Zuletzt gespielt", "Recently played")).padding(Padding::horizontal(1));
     let lines: Vec<Line> = match app.history.get(&ch.id) {
         Some((_, tracks)) => tracks
             .iter()
@@ -331,7 +348,7 @@ fn draw_history(f: &mut Frame, app: &App, area: Rect) {
                 ])
             })
             .collect(),
-        None => vec![Line::from(Span::styled("Lade …", Style::new().fg(MUTED)))],
+        None => vec![Line::from(Span::styled(tr("Lade …", "Loading …"), Style::new().fg(MUTED)))],
     };
     f.render_widget(Paragraph::new(lines).block(blk), area);
 }
@@ -341,7 +358,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     if let Some((msg, _)) = &app.status {
         spans.push(Span::styled(format!(" {msg} "), Style::new().fg(GOLD)));
     } else {
-        for (k, d) in [("Enter", "Play"), ("␣", "Start/Stop"), ("n/p", "Kanal ±"), ("+/-", "Vol"), ("f", "Fav"), ("/", "Suche"), ("Tab", "Liste"), ("?", "Hilfe"), ("q", "Ende")] {
+        for (k, d) in [("Enter", "Play"), ("␣", "Start/Stop"), ("n/p", tr("Kanal ±", "Channel ±")), ("+/-", "Vol"), ("f", "Fav"), ("/", tr("Suche", "Search")), ("Tab", tr("Liste", "List")), ("?", tr("Hilfe", "Help")), ("q", tr("Ende", "Quit"))] {
             spans.push(Span::styled(format!(" {k}"), Style::new().fg(ACCENT).bold()));
             spans.push(Span::styled(format!(" {d} "), Style::new().fg(MUTED)));
         }
@@ -371,32 +388,32 @@ fn draw_help(f: &mut Frame) {
     let h = 26.min(area.height);
     let popup = Rect::new((area.width - w) / 2, (area.height - h) / 2, w, h);
     let keys = [
-        ("↑/↓  j/k", "Kanal wählen"),
-        ("PgUp/PgDn  g/G", "Seitenweise / Anfang / Ende"),
-        ("Enter", "Kanal abspielen"),
-        ("Leertaste", "Start / Stop (letzter Kanal)"),
+        ("↑/↓  j/k", tr("Kanal wählen", "Select channel")),
+        ("PgUp/PgDn  g/G", tr("Seitenweise / Anfang / Ende", "Page / start / end")),
+        ("Enter", tr("Kanal abspielen", "Play channel")),
+        (tr("Leertaste", "Space"), tr("Start / Stop (letzter Kanal)", "Start / stop (last channel)")),
         ("s", "Stop"),
-        ("n / p", "Nächster / vorheriger Kanal der Liste"),
-        ("r", "Zufälliger Kanal"),
-        ("o", "Zum laufenden Kanal springen"),
-        ("+ / -", "Lautstärke"),
-        ("f", "Favorit an/aus"),
-        ("/", "Suche (Name, Beschreibung, Artists, Genre)"),
-        ("Esc", "Suche beenden"),
-        ("Tab / 1–6", "Liste: Alle, Favoriten, Stimmungen"),
-        ("S", "Hörstatistik (Tab Seite, ←/→ Zeitraum)"),
-        ("Maus", "Klick wählt, Doppelklick spielt, Rad"),
-        ("q", "Beenden"),
+        ("n / p", tr("Nächster / vorheriger Kanal der Liste", "Next / previous channel in list")),
+        ("r", tr("Zufälliger Kanal", "Random channel")),
+        ("o", tr("Zum laufenden Kanal springen", "Jump to playing channel")),
+        ("+ / -", tr("Lautstärke", "Volume")),
+        ("f", tr("Favorit an/aus", "Toggle favorite")),
+        ("/", tr("Suche (Name, Beschreibung, Artists, Genre)", "Search names, artists, genres")),
+        ("Esc", tr("Suche beenden", "End search")),
+        ("Tab / 1–6", tr("Liste: Alle, Favoriten, Stimmungen", "List: all, favorites, moods")),
+        ("S", tr("Hörstatistik (Tab Seite, ←/→ Zeitraum)", "Listening stats (Tab page, ←/→ period)")),
+        (tr("Maus", "Mouse"), tr("Klick wählt, Doppelklick spielt, Rad", "click selects, double-click plays, wheel")),
+        ("q", "Quit"),
     ];
     let mut lines: Vec<Line> = keys
         .iter()
         .map(|(k, d)| Line::from(vec![Span::styled(format!("{k:>16}  "), Style::new().fg(ACCENT).bold()), Span::styled(*d, Style::new().fg(FG))]))
         .collect();
     lines.push(Line::default());
-    lines.push(Line::from(Span::styled("Medientasten / Plasma-Widget steuern ruDI.FM über MPRIS.", Style::new().fg(MUTED))));
-    lines.push(Line::from(Span::styled("OBS: Browserquelle http://127.0.0.1:<port>/", Style::new().fg(MUTED))));
+    lines.push(Line::from(Span::styled(tr("Medientasten / Plasma-Widget steuern ruDI.FM über MPRIS.", "Media keys / Plasma widget control ruDI.FM via MPRIS."), Style::new().fg(MUTED))));
+    lines.push(Line::from(Span::styled(tr("OBS: Browserquelle http://127.0.0.1:<port>/", "OBS: browser source http://127.0.0.1:<port>/"), Style::new().fg(MUTED))));
     f.render_widget(Clear, popup);
-    f.render_widget(Paragraph::new(lines).block(block("Hilfe · beliebige Taste schließt").padding(Padding::uniform(1))), popup);
+    f.render_widget(Paragraph::new(lines).block(block(tr("Hilfe · beliebige Taste schließt", "Help · any key closes")).padding(Padding::uniform(1))), popup);
 }
 
 fn draw_stats(f: &mut Frame, app: &App) {
@@ -404,7 +421,7 @@ fn draw_stats(f: &mut Frame, app: &App) {
     let (d, now) = (&v.data, unix_now());
     let area = f.area();
     f.render_widget(Clear, area);
-    let blk = block("Hörstatistik · Tab Seite · ←/→ Zeitraum · Esc zurück");
+    let blk = block(tr("Hörstatistik · Tab Seite · ←/→ Zeitraum · Esc zurück", "Listening stats · Tab page · ←/→ period · Esc back"));
     let inner = blk.inner(area);
     f.render_widget(blk, area);
 
@@ -420,11 +437,11 @@ fn draw_stats(f: &mut Frame, app: &App) {
     let favourite = d.channels.first().map(|c| c.0.as_str()).unwrap_or("–");
     let kv = |k: &str, val: String| [Span::styled(format!("{k} "), Style::new().fg(MUTED)), Span::styled(format!("{val}   "), Style::new().fg(FG).bold())];
     let line: Vec<Span> = [
-        kv("Hörzeit", fmt_dur(d.secs)),
+        kv(tr("Hörzeit", "Listened"), fmt_dur(d.secs)),
         kv("Tracks", d.tracks.to_string()),
-        kv("Längste Session", fmt_dur(d.longest_session)),
-        kv("Serie", format!("{} Tage", d.streak)),
-        kv("Lieblingskanal", favourite.to_string()),
+        kv(tr("Längste Session", "Longest session"), fmt_dur(d.longest_session)),
+        kv(tr("Serie", "Streak"), format!("{} {}", d.streak, tr("Tage", "days"))),
+        kv(tr("Lieblingskanal", "Top channel"), favourite.to_string()),
     ]
     .into_iter()
     .flatten()
@@ -441,7 +458,7 @@ fn draw_stats(f: &mut Frame, app: &App) {
         periods,
     );
     f.render_widget(
-        Tabs::new(["Kanäle", "Künstler", "Tracks"].map(Line::from))
+        Tabs::new([tr("Kanäle", "Channels"), tr("Künstler", "Artists"), "Tracks"].map(Line::from))
             .select(v.page)
             .style(Style::new().fg(MUTED))
             .highlight_style(tab_style)
@@ -469,7 +486,7 @@ fn draw_stats(f: &mut Frame, app: &App) {
             ])
         })
         .collect();
-    let empty = || vec![Line::from(Span::styled("Keine Daten in diesem Zeitraum.", Style::new().fg(MUTED)))];
+    let empty = || vec![Line::from(Span::styled(tr("Keine Daten in diesem Zeitraum.", "No data in this period."), Style::new().fg(MUTED)))];
     f.render_widget(Paragraph::new(if rows.is_empty() { empty() } else { rows }), list);
 
     let [hours, days] = Layout::horizontal([Constraint::Length(50), Constraint::Min(16)]).areas(charts);
@@ -481,7 +498,7 @@ fn draw_stats(f: &mut Frame, app: &App) {
         .collect();
     f.render_widget(
         BarChart::default()
-            .block(block("Tageszeit"))
+            .block(block(tr("Tageszeit", "Time of day")))
             .data(BarGroup::default().bars(&bars))
             .bar_width(2)
             .bar_gap(0)
@@ -489,5 +506,21 @@ fn draw_stats(f: &mut Frame, app: &App) {
             .label_style(Style::new().fg(MUTED)),
         hours,
     );
-    f.render_widget(Sparkline::default().block(block("Letzte 14 Tage")).data(d.days).style(Style::new().fg(GOLD)), days);
+    f.render_widget(Sparkline::default().block(block(tr("Letzte 14 Tage", "Last 14 days"))).data(d.days).style(Style::new().fg(GOLD)), days);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::marquee_at;
+
+    #[test]
+    fn marquee_bounces_between_both_ends() {
+        let s = "0123456789";
+        assert_eq!(marquee_at(s, 20, 7), s);
+        let frames: Vec<String> = (0..40).map(|i| marquee_at(s, 6, i)).collect();
+        assert!(frames.iter().all(|f| f.chars().count() == 6));
+        assert_eq!(frames[0], "012345");
+        assert!(frames.contains(&"456789".to_string()));
+        assert_eq!(frames[0], frames[(4 + 5) * 2 % 40 .. ][0]);
+    }
 }

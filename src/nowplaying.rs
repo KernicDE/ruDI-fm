@@ -2,6 +2,7 @@
 //! MPRIS (Plasma, playerctl, OBS plugins like Tuna), Discord Rich Presence,
 //! files for OBS text/image sources and a small web overlay for OBS browser sources.
 
+use crate::i18n::tr;
 use std::fs;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -344,7 +345,10 @@ impl Discord {
             let state = if np.artist.is_empty() { format!("DI.FM {}", np.channel) } else { np.artist.clone() };
             let mut large_text = format!("DI.FM · {}", np.channel);
             if np.today_secs >= 60 {
-                large_text += &format!(" · heute {} gehört", crate::stats::fmt_dur(np.today_secs));
+                large_text += &format!(" · {}", {
+                    let d = crate::stats::fmt_dur(np.today_secs);
+                    if crate::i18n::en() { format!("{d} listened today") } else { format!("heute {d} gehört") }
+                });
             }
             let mut assets = Assets::new().large_text(&large_text);
             if let Some(url) = np.cover_url.as_deref() {
@@ -364,7 +368,7 @@ impl Discord {
                 .state(&state)
                 .assets(assets)
                 .timestamps(ts)
-                .buttons(vec![Button::new("Kanal auf DI.FM", &np.channel_url)]);
+                .buttons(vec![Button::new(tr("Kanal auf DI.FM", "Channel on DI.FM"), &np.channel_url)]);
             client.set_activity(activity)
         } else {
             client.clear_activity()

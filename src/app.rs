@@ -13,13 +13,13 @@ use souvlaki::MediaControlEvent;
 
 use crate::AppEvent;
 use crate::api::{self, Channel, Track};
+use crate::i18n::tr;
 use crate::config::{Config, State};
 use crate::data::Catalog;
 use crate::nowplaying::{NowPlaying, Publisher, unix_now};
 use crate::player::{Player, PlayerEvent};
 use crate::stats::{self, Entry, Period, Stats};
 
-const NOW_ALL_INTERVAL: Duration = Duration::from_secs(30);
 const HISTORY_MAX_AGE: Duration = Duration::from_secs(60);
 const SELECT_DEBOUNCE: Duration = Duration::from_millis(350);
 const STATUS_TTL: Duration = Duration::from_secs(6);
@@ -100,8 +100,6 @@ pub struct App {
     pub catalog: Catalog,
     pub channels: Vec<Channel>,
     pub loading: bool,
-    pub now_all: HashMap<u64, Track>,
-    now_all_at: Option<Instant>,
     pub history: HashMap<u64, (Instant, Vec<Track>)>,
     history_pending: Option<u64>,
 
@@ -156,8 +154,8 @@ impl App {
         let catalog = Catalog::load();
         let player = Player::spawn(state.volume, tx.clone())?;
         let publisher = Publisher::start(cfg.discord_app_id.clone(), cfg.overlay_port, tx.clone());
-        let mut tabs = vec!["Alle".to_string(), "★ Favoriten".to_string()];
-        tabs.extend(catalog.moods.iter().map(|(m, _)| m.clone()));
+        let mut tabs = vec![tr("Alle", "All").to_string(), tr("★ Favoriten", "★ Favorites").to_string()];
+        tabs.extend(catalog.moods.iter().map(|(m, _)| crate::i18n::mood(m)));
 
         let (listen, today_secs) = stats::totals(&stats::load(), unix_now());
         let app = App {
@@ -166,8 +164,6 @@ impl App {
             catalog,
             channels: Vec::new(),
             loading: true,
-            now_all: HashMap::new(),
-            now_all_at: None,
             history: HashMap::new(),
             history_pending: None,
             tabs,
@@ -213,11 +209,19 @@ impl App {
         self.catalog.get(&ch.key)
     }
 
+    /// Curated German text, or the API's English one.
+    pub fn desc<'a>(&'a self, ch: &'a Channel) -> &'a str {
+        match self.info(ch) {
+            Some(i) if !crate::i18n::en() => &i.desc,
+            _ => &ch.description,
+        }
+    }
+
     pub fn group_of(&self, ch: &Channel) -> String {
         self.info(ch)
             .map(|i| i.group.clone())
             .or_else(|| ch.filters.first().cloned())
-            .unwrap_or_else(|| "Weitere".into())
+            .unwrap_or_else(|| tr("Weitere", "Other").into())
     }
 
     pub fn selected_channel(&self) -> Option<usize> {
@@ -249,7 +253,7 @@ impl App {
                     "{} {} {} {} {} {}",
                     ch.name,
                     ch.key,
-                    info.map(|i| i.desc.as_str()).unwrap_or(&ch.description),
+                    self.desc(ch),
                     info.map(|i| i.group.as_str()).unwrap_or(""),
                     ch.artists.join(" "),
                     ch.filters.join(" ")
@@ -403,7 +407,7 @@ impl App {
     pub fn toggle(&mut self) {
         if self.loading {
             self.cfg.autoplay = true;
-            self.set_status("Kanalliste lädt – Wiedergabe startet gleich");
+            self.set_status(tr("Kanalliste lädt – Wiedergabe startet gleich", "Loading channels – playback starts soon"));
             return;
         }
         if self.playing.is_some() {
@@ -439,12 +443,12 @@ impl App {
             let url = p.urls[p.url_idx].clone();
             let n = p.url_idx + 1;
             let _ = self.player.play(&url);
-            self.set_status(format!("Stream abgebrochen ({reason}) – wechsle auf Server {n}"));
+            self.set_status(if crate::i18n::en() { format!("Stream dropped ({reason}) – switching to server {n}") } else { format!("Stream abgebrochen ({reason}) – wechsle auf Server {n}") });
         } else {
             let wait = (p.failures.min(6) * 5) as u64;
             p.url_idx = 0;
             p.retry_at = Some(Instant::now() + Duration::from_secs(wait));
-            self.set_status(format!("Stream nicht erreichbar ({reason}) – neuer Versuch in {wait}s"));
+            self.set_status(if crate::i18n::en() { format!("Stream unreachable ({reason}) – retrying in {wait}s") } else { format!("Stream nicht erreichbar ({reason}) – neuer Versuch in {wait}s") });
         }
     }
 
@@ -538,16 +542,10 @@ impl App {
                         self.play_channel(idx);
                     }
                 }
-                self.now_all_at = None;
             }
             AppEvent::Channels(Err(e)) => {
                 self.loading = false;
-                self.set_status(format!("Kanalliste nicht ladbar: {e}"));
-            }
-            AppEvent::NowAll(map) => {
-                if !map.is_empty() {
-                    self.now_all = map;
-                }
+                self.set_status(format!("{} {e}", tr("Kanalliste nicht ladbar:", "Could not load channels:")));
             }
             AppEvent::History(id, tracks) => {
                 if self.history_pending == Some(id) {
@@ -565,7 +563,7 @@ impl App {
                 self.start_urls(&key, urls);
             }
             AppEvent::Streams(_, Err(e)) => {
-                self.set_status(format!("Stream-URLs: {e}"));
+                self.set_status(format!("{} {e}", tr("Stream-URLs:", "Stream URLs:")));
                 self.listened = 0.0;
                 self.playing = None;
             }
@@ -646,10 +644,6 @@ impl App {
         }
         if self.status.as_ref().is_some_and(|(_, at)| at.elapsed() > STATUS_TTL) {
             self.status = None;
-        }
-        if !self.loading && self.now_all_at.is_none_or(|t| t.elapsed() > NOW_ALL_INTERVAL) {
-            self.now_all_at = Some(Instant::now());
-            spawn(&self.tx, || AppEvent::NowAll(api::fetch_now_playing_all().unwrap_or_default()));
         }
 
         // stream reconnect / track match retries

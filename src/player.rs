@@ -105,7 +105,7 @@ impl Player {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .context("mpv starten (ist mpv installiert?)")?;
+            .context(crate::i18n::tr("mpv starten (ist mpv installiert?)", "starting mpv (is mpv installed?)"))?;
 
         let mut socket = None;
         for _ in 0..50 {
@@ -115,7 +115,7 @@ impl Player {
             }
             thread::sleep(Duration::from_millis(50));
         }
-        let socket = socket.context("mpv IPC-Socket nicht erreichbar")?;
+        let socket = socket.context(crate::i18n::tr("mpv IPC-Socket nicht erreichbar", "mpv IPC socket unreachable"))?;
 
         let reader = socket.try_clone()?;
         #[cfg(windows)]

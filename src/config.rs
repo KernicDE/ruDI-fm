@@ -44,6 +44,8 @@ pub struct Config {
     pub overlay_port: u16,
     /// Start playing the last channel on launch.
     pub autoplay: bool,
+    /// UI language: "auto" (follows the locale), "de" or "en".
+    pub language: String,
 }
 
 impl Default for Config {
@@ -54,6 +56,7 @@ impl Default for Config {
             discord_app_id: String::new(),
             overlay_port: 8765,
             autoplay: false,
+            language: "auto".into(),
         }
     }
 }
@@ -71,11 +74,13 @@ impl Config {
         }
         let text = fs::read_to_string(&path).with_context(|| format!("{} lesen", path.display()))?;
         let mut cfg: Config = toml::from_str(&text).with_context(|| format!("{} parsen", path.display()))?;
+        crate::i18n::init(&cfg.language);
         cfg.listen_key = listen_key_from_env().unwrap_or_default();
         if cfg.listen_key.is_empty() {
             bail!(
-                "DIFM_LISTEN_KEY fehlt.\nIn {} oder ./.env eintragen: DIFM_LISTEN_KEY=<key>",
-                config_dir().join(".env").display()
+                "{} {}",
+                crate::i18n::tr("DIFM_LISTEN_KEY fehlt. Eintragen in ./.env oder", "DIFM_LISTEN_KEY missing. Add it to ./.env or"),
+                format!("{}: DIFM_LISTEN_KEY=<key>", config_dir().join(".env").display())
             );
         }
         Ok(cfg)
@@ -119,6 +124,9 @@ overlay_port = 8765
 
 # Beim Start den zuletzt gehörten Kanal abspielen
 autoplay = false
+
+# Sprache / language: "auto" (folgt der Systemsprache), "de" oder "en"
+language = "auto"
 "#;
 
 /// Persistent UI state (favorites, last channel, volume).

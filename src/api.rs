@@ -159,16 +159,6 @@ impl Track {
     }
 }
 
-/// Current track of every channel, keyed by channel id.
-pub fn fetch_now_playing_all() -> Result<HashMap<u64, Track>> {
-    let v = get_json(&format!("{BASE}/track_history"))?;
-    let obj = v.as_object().context("track_history: kein Objekt")?;
-    Ok(obj
-        .iter()
-        .filter_map(|(k, t)| Some((k.parse().ok()?, Track::from_json(t)?)))
-        .collect())
-}
-
 /// Recent tracks of one channel, newest first.
 pub fn fetch_history(channel_id: u64) -> Result<Vec<Track>> {
     let v = get_json(&format!("{BASE}/track_history/channel/{channel_id}"))?;
@@ -179,6 +169,6 @@ pub fn fetch_history(channel_id: u64) -> Result<Vec<Track>> {
 pub fn fetch_stream_urls(quality: &str, key: &str, listen_key: &str) -> Result<Vec<String>> {
     let v = get_json(&format!("{BASE}/listen/{quality}/{key}?listen_key={listen_key}"))?;
     let urls: Vec<String> = v.as_array().into_iter().flatten().filter_map(|u| u.as_str().map(String::from)).collect();
-    anyhow::ensure!(!urls.is_empty(), "Keine Stream-URLs (listen_key/quality prüfen)");
+    anyhow::ensure!(!urls.is_empty(), crate::i18n::tr("Keine Stream-URLs (listen_key/quality prüfen)", "No stream URLs (check listen_key/quality)"));
     Ok(urls)
 }
