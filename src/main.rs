@@ -24,6 +24,7 @@ use player::PlayerEvent;
 pub enum AppEvent {
     Channels(Result<Vec<Channel>, String>),
     Shows(Result<Vec<api::Show>, String>),
+    ShowDesc(String, String),
     History(u64, Vec<Track>),
     Streams(String, Result<Vec<String>, String>),
     Cover(String, Option<image::DynamicImage>),

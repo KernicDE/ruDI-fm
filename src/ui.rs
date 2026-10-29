@@ -66,14 +66,21 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     draw_header(f, app, header);
 
-    let [left, right] = Layout::horizontal([Constraint::Length(34), Constraint::Min(30)]).areas(body);
+    let list_w = if app.tab >= 2 && app.search.is_empty() { 58 } else { 34 };
+    let [left, right] = Layout::horizontal([Constraint::Length(list_w), Constraint::Min(30)]).areas(body);
     draw_list(f, app, left);
 
-    let [now, info, hist] =
-        Layout::vertical([Constraint::Length(13), Constraint::Min(8), Constraint::Length(9)]).areas(right);
-    draw_now_playing(f, app, now);
-    draw_info(f, app, info);
-    draw_history(f, app, hist);
+    if app.tab >= 2 && app.search.is_empty() {
+        let [now, show] = Layout::vertical([Constraint::Length(13), Constraint::Min(8)]).areas(right);
+        draw_now_playing(f, app, now);
+        draw_show(f, app, show);
+    } else {
+        let [now, info, hist] =
+            Layout::vertical([Constraint::Length(13), Constraint::Min(8), Constraint::Length(9)]).areas(right);
+        draw_now_playing(f, app, now);
+        draw_info(f, app, info);
+        draw_history(f, app, hist);
+    }
     draw_footer(f, app, footer);
 
     if app.show_help {
@@ -305,6 +312,47 @@ fn draw_now_playing(f: &mut Frame, app: &mut App, area: Rect) {
             Span::styled(format!(" {v}%"), Style::new().fg(MUTED)),
         ]),
         vol,
+    );
+}
+
+fn draw_show(f: &mut Frame, app: &App, area: Rect) {
+    let Some(sh) = app.selected_show() else {
+        f.render_widget(block(tr("Show", "Show")), area);
+        return;
+    };
+    let label = |s: &'static str| Span::styled(s, Style::new().fg(MUTED));
+    let chan = app.channels.iter().find(|c| c.id == sh.channel_id).map_or("", |c| c.name.as_str());
+    let mut text = Text::default();
+    text.push_line(Line::from(vec![Span::styled(sh.tagline.clone(), Style::new().fg(ACCENT)), Span::styled(format!(" · {chan}"), Style::new().fg(MUTED))]));
+    if sh.live {
+        text.push_line(Line::from(Span::styled(tr("● Läuft gerade", "● Live now"), Style::new().fg(OK).bold())));
+    }
+    if sh.next_start > 0 {
+        text.push_line(Line::from(vec![
+            label(tr("Nächste Sendung: ", "Next broadcast: ")),
+            Span::styled(format!("{} {} {}", crate::app::weekday(sh.next_start), crate::app::date(sh.next_start), crate::app::hm(sh.next_start)), Style::new().fg(FG)),
+        ]));
+    }
+    if !sh.schedule.is_empty() {
+        text.push_line(Line::from(vec![label(tr("Rhythmus:        ", "Schedule:        ")), Span::styled(sh.schedule.clone(), Style::new().fg(FG))]));
+    }
+    if sh.episodes > 0 {
+        text.push_line(Line::from(vec![label(tr("Episoden:        ", "Episodes:        ")), Span::styled(sh.episodes.to_string(), Style::new().fg(FG))]));
+    }
+    text.push_line(Line::default());
+    let desc = match app.show_desc.get(&sh.slug) {
+        Some(d) if !d.is_empty() => d.as_str(),
+        Some(_) => tr("Keine Beschreibung.", "No description."),
+        None => tr("Lade Beschreibung …", "Loading description …"),
+    };
+    for l in desc.lines() {
+        text.push_line(Line::from(Span::styled(l.to_string(), Style::new().fg(FG))));
+    }
+    text.push_line(Line::default());
+    text.push_line(Line::from(Span::styled(tr("Enter: Kanal in „Alle“ öffnen und abspielen", "Enter: open channel in “All” and play"), Style::new().fg(MUTED))));
+    f.render_widget(
+        Paragraph::new(text).wrap(Wrap { trim: true }).block(block(&sh.name).padding(Padding::horizontal(1))),
+        area,
     );
 }
 

@@ -175,7 +175,14 @@ pub fn fetch_stream_urls(quality: &str, key: &str, listen_key: &str) -> Result<V
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Show {
+    #[serde(default)]
+    pub slug: String,
     pub name: String,
+    /// e.g. "Every Thursday".
+    #[serde(default)]
+    pub schedule: String,
+    #[serde(default)]
+    pub episodes: u64,
     pub tagline: String,
     pub channel_id: u64,
     /// Running right now (the API then already reports next week's slot).
@@ -211,6 +218,9 @@ fn fetch_shows_online() -> Result<Vec<Show>> {
         let before = out.len();
         out.extend(list.iter().filter(|s| s["active"].as_bool() == Some(true)).filter_map(|s| {
             Some(Show {
+                slug: s["slug"].as_str()?.to_string(),
+                schedule: s["human_readable_schedule"].as_array().into_iter().flatten().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", "),
+                episodes: s["ondemand_episode_count"].as_u64().unwrap_or(0),
                 name: s["name"].as_str()?.trim().to_string(),
                 tagline: s["artists_tagline"].as_str().unwrap_or_default().trim().to_string(),
                 channel_id: s["channels"][0]["id"].as_u64()?,
@@ -224,4 +234,10 @@ fn fetch_shows_online() -> Result<Vec<Show>> {
         }
     }
     Ok(out)
+}
+
+/// Long text of one show (plain text).
+pub fn fetch_show_description(slug: &str) -> Result<String> {
+    let v = get_json(&format!("{BASE}/shows/{slug}"))?;
+    Ok(v["description"].as_str().unwrap_or_default().trim().to_string())
 }

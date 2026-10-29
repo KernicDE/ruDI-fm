@@ -140,6 +140,9 @@ pub struct App {
     pub channels: Vec<Channel>,
     pub shows: Vec<Show>,
     shows_at: Instant,
+    /// Long show texts by slug, fetched when a show is selected.
+    pub show_desc: HashMap<String, String>,
+    show_desc_pending: Option<String>,
     pub loading: bool,
     pub history: HashMap<u64, (Instant, Vec<Track>)>,
     history_pending: Option<u64>,
@@ -205,6 +208,8 @@ impl App {
             channels: Vec::new(),
             shows: Vec::new(),
             shows_at: Instant::now(),
+            show_desc: HashMap::new(),
+            show_desc_pending: None,
             loading: true,
             history: HashMap::new(),
             history_pending: None,
@@ -275,6 +280,24 @@ impl App {
         }
     }
 
+    pub fn selected_show(&self) -> Option<&Show> {
+        match self.list.selected().and_then(|i| self.rows.get(i)) {
+            Some(Row::Show(s)) => self.shows.get(*s),
+            _ => None,
+        }
+    }
+
+    /// Play a channel; from a show row, jump to it in the full list first.
+    fn activate(&mut self, c: usize) {
+        if self.selected_show().is_some() {
+            self.set_tab(0);
+            if let Some(i) = self.rows.iter().position(|r| *r == Row::Channel(c)) {
+                self.list.select(Some(i));
+            }
+        }
+        self.play_channel(c);
+    }
+
     fn show_channel(&self, show: usize) -> Option<usize> {
         let id = self.shows.get(show)?.channel_id;
         self.channels.iter().position(|c| c.id == id)
@@ -336,7 +359,7 @@ impl App {
             live.sort_by(|&a, &b| self.shows[a].name.to_lowercase().cmp(&self.shows[b].name.to_lowercase()));
             rows.extend(live.into_iter().map(Row::Show));
         } else {
-            let mut plan: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].next_start > 0 && self.show_channel(i).is_some()).collect();
+            let mut plan: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].next_start > 0 && self.shows[i].next_start < unix_now() + 7 * 86400 && self.show_channel(i).is_some()).collect();
             plan.sort_by_key(|&i| self.shows[i].next_start);
             let mut last_day = String::new();
             for i in plan {
@@ -616,6 +639,12 @@ impl App {
                 self.shows_at = Instant::now();
                 self.rebuild_rows();
             }
+            AppEvent::ShowDesc(slug, text) => {
+                if self.show_desc_pending.as_ref() == Some(&slug) {
+                    self.show_desc_pending = None;
+                }
+                self.show_desc.insert(slug, text);
+            }
             AppEvent::Shows(Err(e)) => self.set_status(format!("{} {e}", tr("Shows nicht ladbar:", "Could not load shows:"))),
             AppEvent::Channels(Err(e)) => {
                 self.loading = false;
@@ -759,6 +788,20 @@ impl App {
             self.request_history(id, false);
         }
 
+        if self.selected_at.elapsed() > SELECT_DEBOUNCE
+            && let Some(sh) = self.selected_show()
+            && !self.show_desc.contains_key(&sh.slug)
+            && self.show_desc_pending.as_ref() != Some(&sh.slug)
+            && !sh.slug.is_empty()
+        {
+            let slug = sh.slug.clone();
+            self.show_desc_pending = Some(slug.clone());
+            spawn(&self.tx, move || {
+                let text = api::fetch_show_description(&slug).unwrap_or_default();
+                AppEvent::ShowDesc(slug, text)
+            });
+        }
+
         // cover shown in the TUI: playing track, otherwise selected channel
         let want = if self.playing.is_some() {
             self.now_playing().cover_url
@@ -810,7 +853,7 @@ impl App {
                 KeyCode::Enter => {
                     self.searching = false;
                     if let Some(c) = self.selected_channel() {
-                        self.play_channel(c);
+                        self.activate(c);
                     }
                 }
                 KeyCode::Down => self.move_selection(1),
@@ -850,7 +893,7 @@ impl App {
             KeyCode::End | KeyCode::Char('G') => self.select_edge(true),
             KeyCode::Enter => {
                 if let Some(c) = self.selected_channel() {
-                    self.play_channel(c);
+                    self.activate(c);
                 }
             }
             KeyCode::Char(' ') => self.toggle(),
@@ -962,7 +1005,7 @@ impl App {
                 let double = self.last_click.is_some_and(|(t, i)| i == idx && t.elapsed() < DOUBLE_CLICK);
                 self.last_click = if double { None } else { Some((Instant::now(), idx)) };
                 if double {
-                    self.play_channel(c);
+                    self.activate(c);
                 }
             }
         }
