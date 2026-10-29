@@ -12,7 +12,7 @@ use ratatui_image::protocol::StatefulProtocol;
 use souvlaki::MediaControlEvent;
 
 use crate::AppEvent;
-use crate::api::{self, Channel, Track};
+use crate::api::{self, Channel, Show, Track};
 use crate::i18n::tr;
 use crate::config::{Config, State};
 use crate::data::Catalog;
@@ -25,6 +25,7 @@ const SELECT_DEBOUNCE: Duration = Duration::from_millis(350);
 const STATUS_TTL: Duration = Duration::from_secs(6);
 const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 const MATCH_RETRY: Duration = Duration::from_millis(1500);
+const SHOWS_REFRESH: Duration = Duration::from_secs(300);
 
 /// Clickable areas of the last drawn frame, filled by `ui::draw`.
 #[derive(Default)]
@@ -41,6 +42,44 @@ pub struct Hits {
 pub enum Row {
     Header(String),
     Channel(usize),
+    /// Index into `App::shows`; plays the show's channel.
+    Show(usize),
+}
+
+impl Row {
+    pub fn is_item(&self) -> bool {
+        !matches!(self, Row::Header(_))
+    }
+}
+
+/// Local time `HH:MM` of a unix timestamp.
+pub fn hm(ts: i64) -> String {
+    local(ts).format("%H:%M").to_string()
+}
+
+/// Local date `DD.MM.` of a unix timestamp.
+pub fn date(ts: i64) -> String {
+    local(ts).format("%d.%m.").to_string()
+}
+
+/// Short weekday name in the UI language.
+pub fn weekday(ts: i64) -> &'static str {
+    use chrono::Datelike;
+    let w = local(ts).weekday().num_days_from_monday() as usize;
+    if crate::i18n::en() { ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][w] } else { ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][w] }
+}
+
+fn local(ts: i64) -> chrono::DateTime<chrono::Local> {
+    chrono::DateTime::from_timestamp(ts, 0).unwrap_or_default().with_timezone(&chrono::Local)
+}
+
+fn day_label(ts: i64) -> String {
+    let days = (local(ts).date_naive() - chrono::Local::now().date_naive()).num_days();
+    match days {
+        0 => tr("Heute", "Today").to_string(),
+        1 => tr("Morgen", "Tomorrow").to_string(),
+        _ => format!("{} {}", weekday(ts), date(ts)),
+    }
 }
 
 pub struct Playing {
@@ -99,6 +138,8 @@ pub struct App {
     pub state: State,
     pub catalog: Catalog,
     pub channels: Vec<Channel>,
+    pub shows: Vec<Show>,
+    shows_at: Instant,
     pub loading: bool,
     pub history: HashMap<u64, (Instant, Vec<Track>)>,
     history_pending: Option<u64>,
@@ -154,8 +195,7 @@ impl App {
         let catalog = Catalog::load();
         let player = Player::spawn(state.volume, tx.clone())?;
         let publisher = Publisher::start(cfg.discord_app_id.clone(), cfg.overlay_port, tx.clone());
-        let mut tabs = vec![tr("Alle", "All").to_string(), tr("★ Favoriten", "★ Favorites").to_string()];
-        tabs.extend(catalog.moods.iter().map(|(m, _)| crate::i18n::mood(m)));
+        let tabs = [tr("Alle", "All"), tr("★ Favoriten", "★ Favorites"), tr("Live Shows", "Live Shows"), tr("Show Plan", "Show Plan")].map(String::from).to_vec();
 
         let (listen, today_secs) = stats::totals(&stats::load(), unix_now());
         let app = App {
@@ -163,6 +203,8 @@ impl App {
             state,
             catalog,
             channels: Vec::new(),
+            shows: Vec::new(),
+            shows_at: Instant::now(),
             loading: true,
             history: HashMap::new(),
             history_pending: None,
@@ -196,6 +238,7 @@ impl App {
             quit: false,
         };
         spawn(&app.tx, || AppEvent::Channels(api::fetch_channels().map_err(|e| e.to_string())));
+        spawn(&app.tx, || AppEvent::Shows(api::fetch_shows().map_err(|e| e.to_string())));
         Ok(app)
     }
 
@@ -227,8 +270,14 @@ impl App {
     pub fn selected_channel(&self) -> Option<usize> {
         match self.list.selected().and_then(|i| self.rows.get(i)) {
             Some(Row::Channel(c)) => Some(*c),
+            Some(Row::Show(s)) => self.show_channel(*s),
             _ => None,
         }
+    }
+
+    fn show_channel(&self, show: usize) -> Option<usize> {
+        let id = self.shows.get(show)?.channel_id;
+        self.channels.iter().position(|c| c.id == id)
     }
 
     fn channel_by_key(&self, key: &str) -> Option<usize> {
@@ -242,6 +291,10 @@ impl App {
     // ------------------------------------------------------------ list building
 
     pub fn rebuild_rows(&mut self) {
+        let keep_show = self.list.selected().and_then(|i| self.rows.get(i)).and_then(|r| match r {
+            Row::Show(i) => self.shows.get(*i).map(|s| (s.name.clone(), s.channel_id)),
+            _ => None,
+        });
         let keep = self.selected_channel().or(self.playing.as_ref().map(|p| p.channel));
         let mut rows = Vec::new();
         let q = self.search.to_lowercase();
@@ -278,14 +331,29 @@ impl App {
             // most listened first (stable: ties keep the list order)
             favs.sort_by_key(|&i| std::cmp::Reverse(self.listen.get(&self.channels[i].key).copied().unwrap_or(0)));
             rows.extend(favs.into_iter().map(Row::Channel));
-        } else if let Some((_, keys)) = self.catalog.moods.get(self.tab - 2) {
-            rows.extend(keys.iter().filter_map(|k| self.channel_by_key(k)).map(Row::Channel));
+        } else if self.tab == 2 {
+            let mut live: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].live && self.show_channel(i).is_some()).collect();
+            live.sort_by(|&a, &b| self.shows[a].name.to_lowercase().cmp(&self.shows[b].name.to_lowercase()));
+            rows.extend(live.into_iter().map(Row::Show));
+        } else {
+            let mut plan: Vec<usize> = (0..self.shows.len()).filter(|&i| self.shows[i].next_start > 0 && self.show_channel(i).is_some()).collect();
+            plan.sort_by_key(|&i| self.shows[i].next_start);
+            let mut last_day = String::new();
+            for i in plan {
+                let day = day_label(self.shows[i].next_start);
+                if day != last_day {
+                    rows.push(Row::Header(day.clone()));
+                    last_day = day;
+                }
+                rows.push(Row::Show(i));
+            }
         }
 
         self.rows = rows;
-        let idx = keep
-            .and_then(|c| self.rows.iter().position(|r| *r == Row::Channel(c)))
-            .or_else(|| self.rows.iter().position(|r| matches!(r, Row::Channel(_))));
+        let idx = keep_show
+            .and_then(|(n, c)| self.rows.iter().position(|r| matches!(r, Row::Show(i) if self.shows[*i].name == n && self.shows[*i].channel_id == c)))
+            .or_else(|| keep.and_then(|c| self.rows.iter().position(|r| *r == Row::Channel(c))))
+            .or_else(|| self.rows.iter().position(|r| r.is_item()));
         self.list.select(idx);
         self.selected_at = Instant::now();
     }
@@ -304,7 +372,7 @@ impl App {
                 break;
             }
             i = next;
-            if matches!(self.rows[i as usize], Row::Channel(_)) {
+            if self.rows[i as usize].is_item() {
                 remaining -= 1;
             }
         }
@@ -317,7 +385,7 @@ impl App {
     }
 
     fn select_edge(&mut self, last: bool) {
-        let mut it = self.rows.iter().enumerate().filter(|(_, r)| matches!(r, Row::Channel(_)));
+        let mut it = self.rows.iter().enumerate().filter(|(_, r)| r.is_item());
         let idx = if last { it.next_back() } else { it.next() }.map(|(i, _)| i);
         self.list.select(idx);
         self.selected_at = Instant::now();
@@ -543,6 +611,12 @@ impl App {
                     }
                 }
             }
+            AppEvent::Shows(Ok(list)) => {
+                self.shows = list;
+                self.shows_at = Instant::now();
+                self.rebuild_rows();
+            }
+            AppEvent::Shows(Err(e)) => self.set_status(format!("{} {e}", tr("Shows nicht ladbar:", "Could not load shows:"))),
             AppEvent::Channels(Err(e)) => {
                 self.loading = false;
                 self.set_status(format!("{} {e}", tr("Kanalliste nicht ladbar:", "Could not load channels:")));
@@ -641,6 +715,10 @@ impl App {
         let dt = std::mem::replace(&mut self.last_tick, Instant::now()).elapsed().as_secs_f64();
         if self.playing.as_ref().is_some_and(|p| p.audio) {
             self.listened += dt;
+        }
+        if self.shows_at.elapsed() > SHOWS_REFRESH {
+            self.shows_at = Instant::now();
+            spawn(&self.tx, || AppEvent::Shows(api::fetch_shows().map_err(|e| e.to_string())));
         }
         if self.status.as_ref().is_some_and(|(_, at)| at.elapsed() > STATUS_TTL) {
             self.status = None;
@@ -872,7 +950,12 @@ impl App {
             }
         } else if h.list.contains(pos) {
             let idx = self.list.offset() + (pos.y - h.list.y) as usize;
-            if let Some(Row::Channel(c)) = self.rows.get(idx).cloned() {
+            let chan = match self.rows.get(idx) {
+                Some(Row::Channel(c)) => Some(*c),
+                Some(Row::Show(s)) => self.show_channel(*s),
+                _ => None,
+            };
+            if let Some(c) = chan {
                 self.searching = false;
                 self.list.select(Some(idx));
                 self.selected_at = Instant::now();

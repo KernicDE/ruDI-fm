@@ -117,8 +117,9 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let title = if app.searching || !app.search.is_empty() {
         format!("{} {}{}", tr("Suche:", "Search:"), app.search, if app.searching { "▏" } else { "" })
     } else {
-        let n = app.rows.iter().filter(|r| matches!(r, Row::Channel(_))).count();
-        format!("{} · {n} {}", app.tabs[app.tab], tr("Kanäle", "channels"))
+        let n = app.rows.iter().filter(|r| r.is_item()).count();
+        let unit = if app.tab >= 2 { tr("Shows", "shows") } else { tr("Kanäle", "channels") };
+        format!("{} · {n} {unit}", app.tabs[app.tab])
     };
     let blk = block(&title);
     app.hits.list = blk.inner(area);
@@ -128,7 +129,12 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
     if app.rows.is_empty() {
-        let msg = if app.tab == 1 && app.search.is_empty() { tr("Noch keine Favoriten – mit f markieren.", "No favorites yet – press f to add.") } else { tr("Keine Treffer.", "No matches.") };
+        let msg = match (app.search.is_empty(), app.tab) {
+            (true, 1) => tr("Noch keine Favoriten – mit f markieren.", "No favorites yet – press f to add."),
+            (true, 2) => tr("Gerade läuft keine Show.", "No show is live right now."),
+            (true, 3) => tr("Keine Shows geladen.", "No shows loaded."),
+            _ => tr("Keine Treffer.", "No matches."),
+        };
         f.render_widget(Paragraph::new(msg).fg(MUTED).block(blk), area);
         return;
     }
@@ -144,6 +150,32 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
                 format!("── {g} "),
                 Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
             ))),
+            Row::Show(si) => {
+                let sh = &app.shows[*si];
+                let ch = app.channels.iter().position(|c| c.id == sh.channel_id);
+                let is_playing = ch.is_some() && playing == ch;
+                let marker = if is_playing {
+                    Span::styled("▶ ", Style::new().fg(OK).bold())
+                } else if sh.live {
+                    Span::styled("● ", Style::new().fg(OK))
+                } else {
+                    Span::raw("  ")
+                };
+                // live tab: next slot with weekday; plan tab: day is in the header
+                let when = match (app.tab, sh.next_start) {
+                    (_, 0) => String::new(),
+                    (2, t) => format!("{} {} {}", crate::app::weekday(t), crate::app::date(t), crate::app::hm(t)),
+                    (_, t) => crate::app::hm(t),
+                };
+                let chan = ch.map(|c| app.channels[c].name.as_str()).unwrap_or_default();
+                let name_style = if sh.live { Style::new().fg(OK).bold() } else { Style::new().fg(FG) };
+                ListItem::new(Line::from(vec![
+                    marker,
+                    Span::styled(format!("{when:<16}"), Style::new().fg(MUTED)),
+                    Span::styled(sh.name.clone(), name_style),
+                    Span::styled(format!("  {} · {chan}", sh.tagline), Style::new().fg(MUTED)),
+                ]))
+            }
             Row::Channel(i) => {
                 let ch = &app.channels[*i];
                 let fav = app.state.favorites.contains(&ch.key);
@@ -400,7 +432,7 @@ fn draw_help(f: &mut Frame) {
         ("f", tr("Favorit an/aus", "Toggle favorite")),
         ("/", tr("Suche (Name, Beschreibung, Artists, Genre)", "Search names, artists, genres")),
         ("Esc", tr("Suche beenden", "End search")),
-        ("Tab / 1–6", tr("Liste: Alle, Favoriten, Stimmungen", "List: all, favorites, moods")),
+        ("Tab / 1–4", tr("Liste: Alle, Favoriten, Live Shows, Show Plan", "List: all, favorites, live shows, show plan")),
         ("S", tr("Hörstatistik (Tab Seite, ←/→ Zeitraum)", "Listening stats (Tab page, ←/→ period)")),
         (tr("Maus", "Mouse"), tr("Klick wählt, Doppelklick spielt, Rad", "click selects, double-click plays, wheel")),
         ("q", "Quit"),

@@ -16,24 +16,9 @@ pub struct ChannelInfo {
 #[derive(Debug, Deserialize)]
 pub struct Catalog {
     pub groups_order: Vec<String>,
-    /// (label, channel keys) – order preserved in the JSON array of pairs.
-    #[serde(deserialize_with = "moods_in_order")]
-    pub moods: Vec<(String, Vec<String>)>,
     channels: Vec<ChannelInfo>,
     #[serde(skip)]
     by_key: HashMap<String, usize>,
-}
-
-fn moods_in_order<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<(String, Vec<String>)>, D::Error> {
-    // serde_json with preserve_order is not enabled, so keep the known order explicitly.
-    const ORDER: [&str; 4] = ["Arbeiten / Fokus", "Entspannen", "Gaming / Energie", "Party / Nostalgie"];
-    let mut map: HashMap<String, Vec<String>> = HashMap::deserialize(d)?;
-    let mut out: Vec<(String, Vec<String>)> =
-        ORDER.iter().filter_map(|k| map.remove(*k).map(|v| (k.to_string(), v))).collect();
-    let mut rest: Vec<_> = map.into_iter().collect();
-    rest.sort();
-    out.extend(rest);
-    Ok(out)
 }
 
 impl Catalog {

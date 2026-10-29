@@ -172,3 +172,56 @@ pub fn fetch_stream_urls(quality: &str, key: &str, listen_key: &str) -> Result<V
     anyhow::ensure!(!urls.is_empty(), crate::i18n::tr("Keine Stream-URLs (listen_key/quality prüfen)", "No stream URLs (check listen_key/quality)"));
     Ok(urls)
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Show {
+    pub name: String,
+    pub tagline: String,
+    pub channel_id: u64,
+    /// Running right now (the API then already reports next week's slot).
+    pub live: bool,
+    /// Unix seconds of the next slot, 0 = unscheduled.
+    pub next_start: i64,
+    pub next_end: i64,
+}
+
+/// Active shows with a schedule; cached for offline start.
+pub fn fetch_shows() -> Result<Vec<Show>> {
+    let cache = cache_dir().join("shows.json");
+    match fetch_shows_online() {
+        Ok(list) => {
+            let _ = fs::create_dir_all(cache_dir());
+            let _ = fs::write(&cache, serde_json::to_vec(&list)?);
+            Ok(list)
+        }
+        Err(e) => {
+            let text = fs::read_to_string(&cache).map_err(|_| e)?;
+            Ok(serde_json::from_str(&text)?)
+        }
+    }
+}
+
+fn fetch_shows_online() -> Result<Vec<Show>> {
+    let ts = |v: &Value| chrono::DateTime::parse_from_rfc3339(v.as_str().unwrap_or_default()).map_or(0, |d| d.timestamp());
+    let mut out = Vec::new();
+    // Inactive shows come last; stop at the first page without an active one.
+    for page in 1..=10 {
+        let v = get_json(&format!("{BASE}/shows?per_page=100&page={page}"))?;
+        let list = v["results"].as_array().context("shows: kein results-Array")?;
+        let before = out.len();
+        out.extend(list.iter().filter(|s| s["active"].as_bool() == Some(true)).filter_map(|s| {
+            Some(Show {
+                name: s["name"].as_str()?.trim().to_string(),
+                tagline: s["artists_tagline"].as_str().unwrap_or_default().trim().to_string(),
+                channel_id: s["channels"][0]["id"].as_u64()?,
+                live: s["now_playing"].as_bool().unwrap_or(false),
+                next_start: ts(&s["next_start_at"]),
+                next_end: ts(&s["next_end_at"]),
+            })
+        }));
+        if out.len() == before {
+            break;
+        }
+    }
+    Ok(out)
+}

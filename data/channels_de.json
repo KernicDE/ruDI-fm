@@ -10,41 +10,6 @@
   "Chill, Lounge & Ambient",
   "Pop, Retro & Mainstream"
  ],
- "moods": {
-  "Arbeiten / Fokus": [
-   "ambient",
-   "chillout",
-   "deepprogressivehouse",
-   "dubtechno",
-   "lofihiphop",
-   "minimal",
-   "psybient",
-   "spacemusic"
-  ],
-  "Entspannen": [
-   "chilloutdreams",
-   "lounge",
-   "vocalchillout",
-   "psychill",
-   "downtempolounge",
-   "lofiloungenchill"
-  ],
-  "Gaming / Energie": [
-   "synthwave",
-   "epictrance",
-   "drumandbass",
-   "dubstep",
-   "hardstyle",
-   "futuresynthpop"
-  ],
-  "Party / Nostalgie": [
-   "classiceurodance",
-   "oldschoolrave",
-   "handsup",
-   "classictrance",
-   "edm"
-  ]
- },
  "channels": [
   {
    "key": "trance",

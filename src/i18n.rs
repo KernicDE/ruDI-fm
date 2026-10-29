@@ -23,15 +23,3 @@ pub fn en() -> bool {
 pub fn tr(de: &'static str, en_: &'static str) -> &'static str {
     if en() { en_ } else { de }
 }
-
-/// Mood tab names come from the German catalog.
-pub fn mood(name: &str) -> String {
-    let en_ = match name {
-        "Arbeiten / Fokus" => "Work / Focus",
-        "Entspannen" => "Relax",
-        "Gaming / Energie" => "Gaming / Energy",
-        "Party / Nostalgie" => "Party / Nostalgia",
-        _ => return name.to_string(),
-    };
-    if en() { en_.to_string() } else { name.to_string() }
-}
