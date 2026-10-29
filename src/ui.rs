@@ -274,7 +274,8 @@ fn draw_player(f: &mut Frame, app: &mut App, area: Rect, mini: bool) {
         return;
     }
 
-    let blk = Block::default().borders(Borders::TOP).border_style(Style::new().fg(ACCENT_DIM));
+    // blank row above the player instead of a rule
+    let blk = Block::default().padding(Padding::top(1));
     let inner = blk.inner(area);
     f.render_widget(blk, area);
     let [cover, _, text] = Layout::horizontal([Constraint::Length(8), Constraint::Length(2), Constraint::Min(10)]).areas(inner);
