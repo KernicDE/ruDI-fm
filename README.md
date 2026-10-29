@@ -8,6 +8,7 @@ Schlanker Terminal-Player für DI.FM Premium, geschrieben in Rust (ratatui + mpv
 - Favoriten, Suche, Stimmungs-Listen (Fokus, Entspannen, Gaming, Party)
 - Automatischer Serverwechsel bei Stream-Abbruch (3 Spiegelserver) und Neuverbindung
 - Now-Playing nach außen: MPRIS, Discord Rich Presence, Dateien und Web-Overlay für OBS
+- Automatischer Build für Linux, macOS und Windows bei jedem Push auf `master` (Release `latest`); Updater: `rudi-fm update` (Hinweis beim Start, wenn ein neuerer Build vorliegt; nicht in lokal gebauten Versionen)
 
 ## Voraussetzungen
 
@@ -118,3 +119,7 @@ data/
 ```
 
 Titelabgleich: Maßgeblich ist der ICY-Titel aus dem Stream, also das, was gerade tatsächlich zu hören ist. Zu diesem Titel sucht ruDI.FM im API-Verlauf des Kanals Cover, Länge und Votes. Die Kanalliste wird für den Offline-Start in `~/.cache/rudi-fm/` zwischengespeichert.
+
+## Downloads und Updates
+
+Jeder Push auf `master` baut Linux (x86_64), Windows (x86_64) und macOS (universal) und aktualisiert das Release [`latest`](https://github.com/KernicDE/ruDI-fm/releases/tag/latest). `rudi-fm update` ersetzt das laufende Programm durch den neuesten Build. Voraussetzung ist ein Download aus diesem Release, lokal gebaute Versionen kennen ihren Commit nicht. Der Windows-Build ist ungetestet (mpv-IPC über Named Pipe).

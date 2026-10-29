@@ -6,6 +6,7 @@ mod nowplaying;
 mod player;
 mod stats;
 mod ui;
+mod updater;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -38,6 +39,9 @@ fn main() -> Result<()> {
         return Ok(());
     }
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).is_some_and(|a| a == "update") {
+        return updater::run();
+    }
     if args.get(1).is_some_and(|a| a == "stats") {
         let entries = stats::load();
         match args.get(2).map(String::as_str) {
@@ -71,7 +75,12 @@ fn main() -> Result<()> {
 
 fn run(terminal: &mut ratatui::DefaultTerminal, cfg: Config, state: State, picker: Picker) -> Result<()> {
     let (tx, rx) = mpsc::channel();
-    let mut app = App::new(cfg, state, picker, tx)?;
+    let mut app = App::new(cfg, state, picker, tx.clone())?;
+    std::thread::spawn(move || {
+        if updater::available() {
+            let _ = tx.send(AppEvent::Status("Update verfügbar: im Terminal `rudi-fm update` ausführen".into()));
+        }
+    });
 
     while !app.quit {
         while let Ok(ev) = rx.try_recv() {

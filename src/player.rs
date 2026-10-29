@@ -1,7 +1,6 @@
 //! mpv as audio backend, controlled via JSON IPC.
 
-use std::io::{BufRead, BufReader, Write};
-use std::os::unix::net::UnixStream;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::Sender;
@@ -12,6 +11,58 @@ use anyhow::{Context, Result};
 use serde_json::{Value, json};
 
 use crate::AppEvent;
+
+#[cfg(unix)]
+type Ipc = std::os::unix::net::UnixStream;
+#[cfg(windows)]
+type Ipc = std::fs::File;
+
+#[cfg(unix)]
+fn ipc_path() -> PathBuf {
+    std::env::temp_dir().join(format!("rudi-fm-{}.sock", std::process::id()))
+}
+#[cfg(windows)]
+fn ipc_path() -> PathBuf {
+    PathBuf::from(format!(r"\\.\pipe\rudi-fm-{}", std::process::id()))
+}
+
+#[cfg(unix)]
+fn ipc_connect(path: &std::path::Path) -> std::io::Result<Ipc> {
+    Ipc::connect(path)
+}
+#[cfg(windows)]
+fn ipc_connect(path: &std::path::Path) -> std::io::Result<Ipc> {
+    std::fs::OpenOptions::new().read(true).write(true).open(path)
+}
+
+/// A blocking read on a synchronous Windows pipe handle blocks writes on its clone,
+/// so only read what `PeekNamedPipe` reports as available.
+#[cfg(windows)]
+struct PipeReader(Ipc);
+
+#[cfg(windows)]
+impl Read for PipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        use std::os::windows::io::AsRawHandle;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn PeekNamedPipe(h: *mut std::ffi::c_void, buf: *mut u8, size: u32, read: *mut u32, avail: *mut u32, left: *mut u32) -> i32;
+        }
+        loop {
+            let mut avail = 0u32;
+            // SAFETY: valid pipe handle; null buffer with size 0 is allowed.
+            let ok = unsafe { PeekNamedPipe(self.0.as_raw_handle(), std::ptr::null_mut(), 0, std::ptr::null_mut(), &mut avail, std::ptr::null_mut()) };
+            if ok == 0 {
+                return Ok(0); // mpv closed the pipe
+            }
+            if avail > 0 {
+                let n = buf.len().min(avail as usize);
+                return self.0.read(&mut buf[..n]);
+            }
+            thread::sleep(Duration::from_millis(30));
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum PlayerEvent {
@@ -25,13 +76,13 @@ pub enum PlayerEvent {
 
 pub struct Player {
     child: Child,
-    socket: UnixStream,
+    socket: Ipc,
     path: PathBuf,
 }
 
 impl Player {
     pub fn spawn(volume: i64, tx: Sender<AppEvent>) -> Result<Self> {
-        let path = std::env::temp_dir().join(format!("rudi-fm-{}.sock", std::process::id()));
+        let path = ipc_path();
         let _ = std::fs::remove_file(&path);
 
         let child = Command::new("mpv")
@@ -58,7 +109,7 @@ impl Player {
 
         let mut socket = None;
         for _ in 0..50 {
-            if let Ok(s) = UnixStream::connect(&path) {
+            if let Ok(s) = ipc_connect(&path) {
                 socket = Some(s);
                 break;
             }
@@ -67,6 +118,8 @@ impl Player {
         let socket = socket.context("mpv IPC-Socket nicht erreichbar")?;
 
         let reader = socket.try_clone()?;
+        #[cfg(windows)]
+        let reader = PipeReader(reader);
         thread::spawn(move || read_events(reader, tx));
 
         let mut p = Player { child, socket, path };
@@ -107,7 +160,7 @@ impl Drop for Player {
     }
 }
 
-fn read_events(stream: UnixStream, tx: Sender<AppEvent>) {
+fn read_events(stream: impl Read, tx: Sender<AppEvent>) {
     for line in BufReader::new(stream).lines() {
         let Ok(line) = line else { break };
         let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
